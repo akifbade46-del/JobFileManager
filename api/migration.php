@@ -14,7 +14,7 @@ class MigrationAPI {
     public function handleRequest() {
         $method = getRequestMethod();
         $path = getPathInfo();
-        $segments = array_filter(explode('/', $path));
+        $segments = explode('/', trim($path, '/'));
         $action = $segments[1] ?? '';
         
         // All migration operations require admin role

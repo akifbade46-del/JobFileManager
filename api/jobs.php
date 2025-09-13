@@ -14,7 +14,7 @@ class JobsAPI {
     public function handleRequest() {
         $method = getRequestMethod();
         $path = getPathInfo();
-        $segments = array_filter(explode('/', $path));
+        $segments = explode('/', trim($path, '/'));
         $action = $segments[1] ?? '';
         $id = $segments[2] ?? null;
         

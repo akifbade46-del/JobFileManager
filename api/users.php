@@ -14,7 +14,7 @@ class UsersAPI {
     public function handleRequest() {
         $method = getRequestMethod();
         $path = getPathInfo();
-        $segments = array_filter(explode('/', $path));
+        $segments = explode('/', trim($path, '/'));
         $id = $segments[1] ?? null;
         
         // All user management requires admin role

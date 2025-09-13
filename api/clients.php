@@ -14,7 +14,7 @@ class ClientsAPI {
     public function handleRequest() {
         $method = getRequestMethod();
         $path = getPathInfo();
-        $segments = array_filter(explode('/', $path));
+        $segments = explode('/', trim($path, '/'));
         $id = $segments[1] ?? null;
         
         switch ($method) {

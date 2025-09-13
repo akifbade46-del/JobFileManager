@@ -44,10 +44,40 @@ function getPostParams() {
 }
 
 /**
- * Get path info for routing
+ * Get path info for routing - Shared hosting compatible
  */
 function getPathInfo() {
-    return $_SERVER['PATH_INFO'] ?? '/';
+    // For shared hosting compatibility, use query parameter instead of PATH_INFO
+    $path = $_GET['path'] ?? '';
+    
+    // Clean and normalize path
+    $path = '/' . trim($path, '/');
+    
+    // Remove query string if present
+    if (($pos = strpos($path, '?')) !== false) {
+        $path = substr($path, 0, $pos);
+    }
+    
+    return $path === '/' ? '/' : $path;
+}
+
+/**
+ * Get URL segments for routing - Fixed indexing
+ */
+function getSegments($path = null) {
+    if ($path === null) {
+        $path = getPathInfo();
+    }
+    
+    // Remove leading/trailing slashes and split
+    $segments = explode('/', trim($path, '/'));
+    
+    // Handle empty path
+    if (count($segments) === 1 && $segments[0] === '') {
+        return [];
+    }
+    
+    return $segments;
 }
 
 /**

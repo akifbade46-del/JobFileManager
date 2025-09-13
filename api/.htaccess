@@ -25,14 +25,16 @@ RewriteRule ^(.*)$ - [E=HTTP_ACCESS_CONTROL_REQUEST_METHOD:%{HTTP:Access-Control
 RewriteRule ^(.*)$ - [E=HTTP_ACCESS_CONTROL_REQUEST_HEADERS:%{HTTP:Access-Control-Request-Headers}]
 
 # Set CORS origin for allowed domains
-RewriteCond %{HTTP:Origin} ^https?://(localhost|127\.0\.0\.1|.*\.replit\.app|.*\.hostinger\.|.*\.qgo-cargo\.com)(:[0-9]+)?$
+RewriteCond %{HTTP:Origin} ^https?://(localhost|127\.0\.0\.1|.*\.replit\.app|.*\.hostinger\.|.*\.qgo-cargo\.com|.*)(:[0-9]+)?$
 RewriteRule ^(.*)$ - [E=CORS_ORIGIN:%{HTTP:Origin}]
 Header always set Access-Control-Allow-Origin "%{CORS_ORIGIN}e" env=CORS_ORIGIN
+Header always set Vary "Origin"
+Header always set Access-Control-Max-Age "86400"
 
-# Route all API requests through index.php
+# Route all API requests through index.php with path parameter
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^(.*)$ index.php [QSA,L]
+RewriteRule ^(.*)$ index.php?path=$1 [QSA,L]
 
 # Handle OPTIONS requests for CORS
 RewriteCond %{REQUEST_METHOD} OPTIONS

@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // Get request info
 $method = getRequestMethod();
 $path = getPathInfo();
-$segments = array_filter(explode('/', $path));
+$segments = explode('/', trim($path, '/'));
 
 // Simple routing based on first segment
 try {

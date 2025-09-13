@@ -14,7 +14,7 @@ class ActivityAPI {
     public function handleRequest() {
         $method = getRequestMethod();
         $path = getPathInfo();
-        $segments = array_filter(explode('/', $path));
+        $segments = explode('/', trim($path, '/'));
         
         if ($method !== 'GET') {
             respond(['error' => 'Method not allowed'], 405);
