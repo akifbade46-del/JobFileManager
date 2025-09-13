@@ -26,7 +26,10 @@ window.Router = {
         '/admin/users': () => Router.showAdminUsers(),
         '/admin/migration': () => Router.showAdminMigration(),
         '/profile': () => Router.showProfile(),
-        '/activity': () => Router.showActivity()
+        '/activity': () => Router.showActivity(),
+        '/pod/driver': () => Router.showPODDriver(),
+        '/pod/supervisor': () => Router.showPODSupervisor(),
+        '/pod/feedback/:id': (id) => Router.showPODFeedback(id)
     },
     
     /**
@@ -177,6 +180,7 @@ window.Router = {
         if (path.startsWith('/clients')) return 'clients';
         if (path.startsWith('/analytics')) return 'analytics';
         if (path.startsWith('/admin')) return 'admin';
+        if (path.startsWith('/pod')) return 'pod';
         
         return path.substring(1) || 'dashboard';
     },
@@ -370,6 +374,45 @@ window.Router = {
         const mainContent = document.getElementById('main-content');
         if (mainContent) {
             mainContent.innerHTML = content;
+        }
+    },
+    
+    /**
+     * Show POD Driver Dashboard
+     */
+    showPODDriver: function() {
+        Auth.requireAnyRole(['driver']);
+        UI.showPage('pod-driver-template');
+        
+        // Initialize POD system for driver
+        if (window.POD) {
+            POD.init();
+        }
+    },
+    
+    /**
+     * Show POD Supervisor Dashboard
+     */
+    showPODSupervisor: function() {
+        Auth.requireAnyRole(['supervisor', 'admin']);
+        UI.showPage('pod-supervisor-template');
+        
+        // Initialize POD system for supervisor
+        if (window.POD) {
+            POD.init();
+        }
+    },
+    
+    /**
+     * Show POD Feedback Form (public)
+     */
+    showPODFeedback: function(deliveryId) {
+        // Public feedback form - no auth required
+        UI.showPage('pod-feedback-template');
+        
+        // Initialize feedback form
+        if (window.POD && deliveryId) {
+            POD.initFeedbackForm(deliveryId);
         }
     },
     

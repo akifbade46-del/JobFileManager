@@ -1,0 +1,491 @@
+<!-- POD System Templates -->
+<!-- These templates are dynamically loaded by the routing system -->
+
+<!-- POD Driver Dashboard Template -->
+<script type="text/template" id="pod-driver-template">
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-truck mr-3 text-blue-600"></i>
+                    Driver Dashboard
+                </h1>
+                <p class="text-gray-500 mt-1">Manage your delivery assignments and complete PODs</p>
+            </div>
+            <div class="text-sm text-right">
+                <p class="font-medium">Welcome, <span id="user-display-name" class="font-bold text-gray-800"></span></p>
+                <div class="flex items-center justify-end gap-4 mt-2">
+                    <button onclick="POD.showFeedbackHistory()" class="btn btn-secondary text-xs" data-testid="button-feedback-history">
+                        My Ratings
+                    </button>
+                    <button onclick="Auth.logout()" class="btn btn-secondary text-xs" data-testid="button-logout">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white p-6 rounded-xl shadow-md flex items-center gap-4 border-l-4 border-yellow-400">
+                <div class="bg-yellow-100 p-3 rounded-full">
+                    <i class="fas fa-clock text-2xl text-yellow-600"></i>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Pending</p>
+                    <p id="stat-pending" class="text-2xl font-bold text-gray-800">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-md flex items-center gap-4 border-l-4 border-green-400">
+                <div class="bg-green-100 p-3 rounded-full">
+                    <i class="fas fa-check-circle text-2xl text-green-600"></i>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Completed</p>
+                    <p id="stat-completed" class="text-2xl font-bold text-gray-800">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-md flex items-center gap-4 border-l-4 border-blue-400">
+                <div class="bg-blue-100 p-3 rounded-full">
+                    <i class="fas fa-truck text-2xl text-blue-600"></i>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Total</p>
+                    <p id="stat-total" class="text-2xl font-bold text-gray-800">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-md flex items-center gap-4 border-l-4 border-purple-400">
+                <div class="bg-purple-100 p-3 rounded-full">
+                    <i class="fas fa-star text-2xl text-purple-600"></i>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Rating</p>
+                    <p id="driver-rating" class="text-sm font-bold text-gray-800">☆☆☆☆☆</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Driver Tasks -->
+        <div class="bg-white p-6 rounded-xl shadow-md">
+            <div class="flex justify-between items-center mb-6 pb-4 border-b">
+                <h2 class="text-2xl font-bold text-gray-800">My Deliveries</h2>
+                <button onclick="location.reload()" class="btn btn-secondary text-sm" data-testid="button-refresh">
+                    <i class="fas fa-refresh mr-2"></i>
+                    Refresh
+                </button>
+            </div>
+            <div id="driver-tasks-list"></div>
+        </div>
+    </div>
+</script>
+
+<!-- POD Supervisor Dashboard Template -->
+<script type="text/template" id="pod-supervisor-template">
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 flex items-center">
+                    <i class="fas fa-clipboard-list mr-3 text-blue-600"></i>
+                    Delivery Management
+                </h1>
+                <p class="text-gray-500 mt-1">Assign, track, and manage all job file deliveries</p>
+            </div>
+            <div class="text-sm text-right">
+                <p class="font-medium">Welcome, <span id="user-display-name" class="font-bold text-gray-800"></span></p>
+                <div class="flex items-center justify-end gap-4 mt-2">
+                    <a href="#/dashboard" class="btn btn-secondary text-xs" data-testid="link-main-system">
+                        Main System
+                    </a>
+                    <button onclick="Auth.logout()" class="btn btn-secondary text-xs" data-testid="button-logout">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-xl shadow-md flex items-center gap-5 border-l-4 border-yellow-400">
+                <div class="bg-yellow-100 p-3 rounded-full">
+                    <i class="fas fa-clock text-2xl text-yellow-600"></i>
+                </div>
+                <div>
+                    <p class="text-base text-gray-500">Pending</p>
+                    <p id="stat-pending" class="text-3xl font-extrabold text-gray-800">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-md flex items-center gap-5 border-l-4 border-green-400">
+                <div class="bg-green-100 p-3 rounded-full">
+                    <i class="fas fa-check-circle text-2xl text-green-600"></i>
+                </div>
+                <div>
+                    <p class="text-base text-gray-500">Completed</p>
+                    <p id="stat-completed" class="text-3xl font-extrabold text-gray-800">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-md flex items-center gap-5 border-l-4 border-blue-400">
+                <div class="bg-blue-100 p-3 rounded-full">
+                    <i class="fas fa-truck text-2xl text-blue-600"></i>
+                </div>
+                <div>
+                    <p class="text-base text-gray-500">Total Deliveries</p>
+                    <p id="stat-total" class="text-3xl font-extrabold text-gray-800">0</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Assign New Delivery -->
+        <div class="bg-white p-6 rounded-xl shadow-md mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-3">
+                <i class="fas fa-plus-circle text-blue-600"></i>
+                <span>Assign New Delivery</span>
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+                <div class="space-y-4">
+                    <div class="relative">
+                        <label for="job-file-search" class="block text-sm font-medium text-gray-700 mb-1">Search Job File</label>
+                        <input type="text" id="job-file-search" class="input-field" placeholder="Job No, Shipper, or Consignee..." data-testid="input-job-search">
+                        <div id="job-file-suggestions" class="suggestions-container hidden"></div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Job Details</label>
+                        <div class="p-3 bg-gray-50 rounded-md text-sm border">
+                            <p><strong>Job No:</strong> <span id="form-job-file-no">Select a job</span></p>
+                            <p><strong>Details:</strong> <span id="form-job-shipper-consignee">N/A</span></p>
+                        </div>
+                    </div>
+                </div>
+                <form id="delivery-form" class="space-y-4" data-testid="form-delivery-assignment">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="delivery-origin" class="block text-sm font-medium text-gray-700 mb-1">Origin</label>
+                            <input type="text" name="origin" id="delivery-origin" class="input-field" placeholder="Auto-filled from Job" data-testid="input-origin">
+                        </div>
+                        <div>
+                            <label for="delivery-destination" class="block text-sm font-medium text-gray-700 mb-1">Destination</label>
+                            <input type="text" name="destination" id="delivery-destination" class="input-field" placeholder="Auto-filled from Job" data-testid="input-destination">
+                        </div>
+                        <div>
+                            <label for="delivery-airlines" class="block text-sm font-medium text-gray-700 mb-1">Airlines</label>
+                            <input type="text" name="airlines" id="delivery-airlines" class="input-field" placeholder="Optional" data-testid="input-airlines">
+                        </div>
+                        <div>
+                            <label for="delivery-mawb" class="block text-sm font-medium text-gray-700 mb-1">AWB / MAWB</label>
+                            <input type="text" name="mawb" id="delivery-mawb" class="input-field" placeholder="Auto-filled from Job" data-testid="input-mawb">
+                        </div>
+                        <div class="col-span-1 sm:col-span-2">
+                            <label for="delivery-inv" class="block text-sm font-medium text-gray-700 mb-1">Invoice No.</label>
+                            <input type="text" name="invoice_no" id="delivery-inv" class="input-field" placeholder="Auto-filled from Job" data-testid="input-invoice">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="delivery-location" class="block text-sm font-medium text-gray-700 mb-1">Delivery Location *</label>
+                        <textarea name="delivery_location" id="delivery-location" rows="2" class="input-field" placeholder="Enter the full delivery address" required data-testid="input-location"></textarea>
+                    </div>
+                    <div>
+                        <label for="additional-notes" class="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
+                        <textarea name="additional_notes" id="additional-notes" rows="2" class="input-field" placeholder="e.g., Contact person, delivery instructions" data-testid="input-notes"></textarea>
+                    </div>
+                    <div>
+                        <label for="driver-select" class="block text-sm font-medium text-gray-700 mb-1">Assign Driver *</label>
+                        <select name="driver_id" id="driver-select" class="input-field" required data-testid="select-driver">
+                            <option value="">-- Select a Driver --</option>
+                        </select>
+                    </div>
+                    <div class="text-right">
+                        <button type="submit" class="btn btn-primary" data-testid="button-assign-delivery">
+                            <i class="fas fa-truck mr-2"></i>
+                            Assign Delivery
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Delivery Lists -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-3">
+                   <i class="fas fa-clock text-yellow-600"></i>
+                   <span>Pending Deliveries</span>
+                </h2>
+                <input type="text" id="pending-search" class="input-field mb-4" placeholder="Search pending deliveries..." data-testid="input-pending-search">
+                <div id="pending-deliveries-list" class="space-y-4 max-h-96 overflow-y-auto"></div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-3">
+                    <i class="fas fa-check-circle text-green-600"></i>
+                    <span>Completed Deliveries</span>
+                </h2>
+                <input type="text" id="completed-search" class="input-field mb-4" placeholder="Search completed deliveries..." data-testid="input-completed-search">
+                <div id="completed-deliveries-list" class="space-y-4 max-h-96 overflow-y-auto"></div>
+            </div>
+        </div>
+    </div>
+</script>
+
+<!-- POD Feedback Template (Public) -->
+<script type="text/template" id="pod-feedback-template">
+    <div class="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
+        <div class="max-w-lg w-full space-y-6 bg-white p-8 rounded-xl shadow-lg text-center">
+            <div class="flex items-center justify-center mb-6">
+                <i class="fas fa-ship text-4xl text-blue-600 mr-3"></i>
+                <h1 class="text-4xl font-bold text-gray-900">Q'go<span class="text-teal-500">Cargo</span></h1>
+            </div>
+            
+            <div id="feedback-form-container">
+                <h2 class="text-2xl font-bold text-gray-800">Rate Your Delivery</h2>
+                <p class="text-gray-500 mt-2">Job File: <span id="feedback-job-no" class="font-medium"></span></p>
+                <p class="text-gray-500">Driver: <span id="feedback-driver-name" class="font-medium"></span></p>
+                
+                <form id="feedback-form" class="mt-6 space-y-6" data-testid="form-feedback">
+                    <input type="hidden" id="feedback-delivery-id" name="delivery_id">
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Your Rating</label>
+                        <div class="rating-stars">
+                            <input type="radio" id="star5" name="rating" value="5" data-testid="rating-5" />
+                            <label for="star5" title="5 stars">★</label>
+                            <input type="radio" id="star4" name="rating" value="4" data-testid="rating-4" />
+                            <label for="star4" title="4 stars">★</label>
+                            <input type="radio" id="star3" name="rating" value="3" data-testid="rating-3" />
+                            <label for="star3" title="3 stars">★</label>
+                            <input type="radio" id="star2" name="rating" value="2" data-testid="rating-2" />
+                            <label for="star2" title="2 stars">★</label>
+                            <input type="radio" id="star1" name="rating" value="1" data-testid="rating-1" />
+                            <label for="star1" title="1 star">★</label>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="feedback-comment" class="block text-sm font-medium text-gray-700">Comments (Optional)</label>
+                        <textarea name="comment" id="feedback-comment" rows="4" class="input-field mt-1" placeholder="Tell us about your experience..." data-testid="input-feedback-comment"></textarea>
+                    </div>
+                    
+                    <div>
+                        <button type="submit" class="btn btn-primary w-full" data-testid="button-submit-feedback">
+                            <i class="fas fa-paper-plane mr-2"></i>
+                            Submit Feedback
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <div id="feedback-thanks-message" class="hidden">
+                <div class="text-6xl mb-4">🎉</div>
+                <h2 class="text-2xl font-bold text-gray-800">Thank You!</h2>
+                <p class="text-gray-600 mt-2">Your feedback has been submitted successfully.</p>
+                <p class="text-sm text-gray-500 mt-4">Your feedback helps us improve our delivery service.</p>
+            </div>
+        </div>
+    </div>
+</script>
+
+<!-- Delivery Completion Modal -->
+<div id="delivery-completion-modal" class="overlay">
+    <div class="modal-content max-w-lg">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-2xl font-bold flex items-center">
+                <i class="fas fa-check-circle text-green-600 mr-2"></i>
+                Complete Delivery
+            </h3>
+            <button onclick="UI.closeModal('delivery-completion-modal')" class="text-gray-500 hover:text-gray-800 text-3xl" data-testid="button-close-modal">&times;</button>
+        </div>
+        
+        <form id="completion-form" class="space-y-4" data-testid="form-completion">
+            <input type="hidden" id="delivery-id-input" name="delivery_id">
+            
+            <div class="p-4 bg-gray-50 rounded-md">
+                <p><strong>Job File:</strong> <span id="modal-job-no"></span></p>
+                <p><strong>Location:</strong> <span id="modal-location"></span></p>
+            </div>
+            
+            <div>
+                <label for="receiver-name" class="block text-sm font-medium text-gray-700">Receiver's Name *</label>
+                <input type="text" name="receiver_name" id="receiver-name" class="input-field mt-1" required data-testid="input-receiver-name">
+            </div>
+            
+            <div>
+                <label for="receiver-mobile" class="block text-sm font-medium text-gray-700">Receiver's Mobile</label>
+                <input type="tel" name="receiver_mobile" id="receiver-mobile" class="input-field mt-1" placeholder="+965XXXXXXXX" data-testid="input-receiver-mobile">
+            </div>
+            
+            <div>
+                <label for="delivery-notes" class="block text-sm font-medium text-gray-700">Delivery Notes</label>
+                <textarea name="delivery_notes" id="delivery-notes" rows="3" class="input-field mt-1" placeholder="Any special notes about the delivery..." data-testid="input-delivery-notes"></textarea>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Receiver's Signature *</label>
+                <div class="relative w-full h-48 mt-1 bg-white border-2 border-dashed border-gray-300 rounded-md">
+                    <canvas id="signature-pad" class="signature-pad-canvas w-full h-full cursor-crosshair"></canvas>
+                </div>
+                <div class="text-right mt-2">
+                    <button type="button" id="clear-signature" class="btn btn-secondary text-sm" data-testid="button-clear-signature">
+                        <i class="fas fa-eraser mr-1"></i>
+                        Clear Signature
+                    </button>
+                </div>
+            </div>
+            
+            <div class="text-right pt-4 border-t">
+                <button type="button" onclick="UI.closeModal('delivery-completion-modal')" class="btn btn-secondary mr-2" data-testid="button-cancel">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-success" data-testid="button-complete">
+                    <i class="fas fa-check mr-2"></i>
+                    Complete Delivery
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Styles for POD -->
+<style>
+.input-field {
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    width: 100%;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background-color: #fff;
+}
+
+.input-field:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06);
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+}
+
+.btn-primary { background-color: #2563eb; color: white; }
+.btn-primary:hover { background-color: #1d4ed8; }
+
+.btn-secondary { background-color: #e5e7eb; color: #1f2937; border-color: #d1d5db; }
+.btn-secondary:hover { background-color: #d1d5db; }
+
+.btn-success { background-color: #10b981; color: white; }
+.btn-success:hover { background-color: #059669; }
+
+.btn-danger { background-color: #ef4444; color: white; }
+.btn-danger:hover { background-color: #dc2626; }
+
+.overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.6); display: flex;
+    align-items: center; justify-content: center; z-index: 1000;
+    opacity: 0; visibility: hidden; transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+    padding: 1rem;
+}
+
+.overlay.visible {
+    opacity: 1; visibility: visible;
+}
+
+.modal-content {
+    background: white; padding: 1.5rem; border-radius: 0.75rem;
+    width: 100%; max-width: 600px;
+    max-height: 90vh; overflow-y: auto;
+    transform: scale(0.95); transition: transform 0.3s ease-in-out;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.overlay.visible .modal-content {
+    transform: scale(1);
+}
+
+.suggestions-container {
+    position: absolute;
+    width: 100%;
+    background-color: white;
+    border: 1px solid #d1d5db;
+    border-top: none;
+    border-radius: 0 0 0.5rem 0.5rem;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 50;
+}
+
+.suggestion-item {
+    padding: 0.75rem;
+    cursor: pointer;
+}
+
+.suggestion-item:hover {
+    background-color: #f3f4f6;
+}
+
+.signature-pad-canvas {
+    border: 2px dashed #d1d5db;
+    border-radius: 0.5rem;
+}
+
+.rating-stars {
+    display: inline-flex;
+    flex-direction: row-reverse;
+    justify-content: center;
+}
+
+.rating-stars input[type="radio"] {
+    display: none;
+}
+
+.rating-stars label {
+    font-size: 2.5rem;
+    color: #d1d5db;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.rating-stars input[type="radio"]:checked ~ label,
+.rating-stars label:hover,
+.rating-stars label:hover ~ label {
+    color: #f59e0b;
+}
+
+.delivery-card {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.delivery-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px -4px rgba(0,0,0,0.1);
+}
+
+/* Loading animation */
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255,255,255,.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>

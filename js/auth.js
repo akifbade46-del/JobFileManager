@@ -66,8 +66,15 @@ window.Auth = {
                 this.setUser(response.user);
                 this.loginAttempts = 0; // Reset attempts on successful login
                 
-                // Redirect to dashboard
-                Router.navigate('/dashboard');
+                // Role-based redirection for POD system
+                if (response.user.role === 'driver') {
+                    Router.navigate('/pod/driver');
+                } else if (response.user.role === 'supervisor') {
+                    Router.navigate('/pod/supervisor');
+                } else {
+                    // Redirect to dashboard for other roles
+                    Router.navigate('/dashboard');
+                }
                 
                 UI.showToast('Welcome back!', 'success');
                 return response.user;
@@ -138,7 +145,7 @@ window.Auth = {
         }
         
         const userRole = this.currentUser.role;
-        const roles = ['user', 'checker', 'admin'];
+        const roles = ['user', 'checker', 'admin', 'driver', 'supervisor'];
         const userRoleIndex = roles.indexOf(userRole);
         const requiredRoleIndex = roles.indexOf(requiredRole);
         
