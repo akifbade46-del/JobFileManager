@@ -4,9 +4,19 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'checker' | 'user';
+  status: 'active' | 'pending' | 'blocked';
+}
 
 interface LoginFormProps {
-  onLogin: (user: { email: string; name: string; role: 'admin' | 'checker' | 'user' }) => void;
+  onLogin: (user: User) => void;
 }
 
 export default function LoginForm({ onLogin }: LoginFormProps) {
@@ -16,18 +26,95 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
   const [name, setName] = useState("");
   const [showApprovalMessage, setShowApprovalMessage] = useState(false);
   const [showBlockedMessage, setShowBlockedMessage] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  // Login mutation
+  const loginMutation = useMutation({
+    mutationFn: async (credentials: { email: string; password: string }) => {
+      const response = await apiRequest('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Login failed');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      console.log('Login successful:', data.user);
+      setErrorMessage("");
+      setShowApprovalMessage(false);
+      setShowBlockedMessage(false);
+      onLogin(data.user);
+    },
+    onError: (error: Error) => {
+      console.error('Login error:', error.message);
+      setErrorMessage(error.message);
+      setShowApprovalMessage(false);
+      setShowBlockedMessage(false);
+    }
+  });
+
+  // Registration mutation
+  const registerMutation = useMutation({
+    mutationFn: async (userData: { email: string; password: string; name: string }) => {
+      const response = await apiRequest('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Registration failed');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      console.log('Registration successful:', data);
+      setErrorMessage("");
+      setShowBlockedMessage(false);
+      
+      if (data.user.status === 'pending') {
+        setShowApprovalMessage(true);
+        // Switch back to login mode
+        setIsSignup(false);
+      } else {
+        // Auto-login if account is active
+        onLogin(data.user);
+      }
+    },
+    onError: (error: Error) => {
+      console.error('Registration error:', error.message);
+      setErrorMessage(error.message);
+      setShowApprovalMessage(false);
+      setShowBlockedMessage(false);
+    }
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log(isSignup ? 'Signup submitted' : 'Login submitted', { email, password, name });
+    setErrorMessage("");
+    setShowApprovalMessage(false);
+    setShowBlockedMessage(false);
     
-    // Mock login logic - todo: replace with real authentication
-    if (email.includes('admin')) {
-      onLogin({ email, name: name || 'Admin User', role: 'admin' });
-    } else if (email.includes('checker')) {
-      onLogin({ email, name: name || 'Checker User', role: 'checker' });
+    if (isSignup) {
+      if (!name.trim()) {
+        setErrorMessage("Name is required");
+        return;
+      }
+      registerMutation.mutate({ email, password, name });
     } else {
-      onLogin({ email, name: name || 'Regular User', role: 'user' });
+      loginMutation.mutate({ email, password });
     }
   };
 
@@ -63,6 +150,14 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
             <Alert className="border-red-200 bg-red-50">
               <AlertDescription className="text-red-800">
                 Your account has been blocked by an administrator.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {errorMessage && (
+            <Alert className="border-red-200 bg-red-50">
+              <AlertDescription className="text-red-800">
+                {errorMessage}
               </AlertDescription>
             </Alert>
           )}
@@ -103,8 +198,11 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
               type="submit" 
               className="w-full"
               size="lg"
+              disabled={loginMutation.isPending || registerMutation.isPending}
             >
-              {isSignup ? 'Sign up' : 'Sign in'}
+              {loginMutation.isPending || registerMutation.isPending 
+                ? "Loading..." 
+                : isSignup ? 'Sign up' : 'Sign in'}
             </Button>
           </form>
           

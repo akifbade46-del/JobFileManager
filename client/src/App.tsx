@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery, useMutation } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -12,19 +12,76 @@ import Analytics from "@/components/Analytics";
 import AdminPanel from "@/components/AdminPanel";
 import ClientManager from "@/components/ClientManager";
 import { FileText, Users, BarChart3 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 interface User {
+  id: string;
   email: string;
   name: string;
   role: 'admin' | 'checker' | 'user';
+  status: 'active' | 'pending' | 'blocked';
 }
 
 type View = 'jobform' | 'filemanager' | 'analytics' | 'adminpanel' | 'clientmanager';
 
-function App() {
+function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<View>('jobform');
   const [currentJobFile, setCurrentJobFile] = useState(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Check authentication status on app load
+  const { data: authData, error: authError, isLoading } = useQuery({
+    queryKey: ['/api/auth/me'],
+    queryFn: async () => {
+      try {
+        const response = await apiRequest('/api/auth/me');
+        if (response.ok) {
+          return response.json();
+        }
+        return null;
+      } catch (error) {
+        return null;
+      }
+    },
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  // Set user from authentication check
+  useEffect(() => {
+    if (!isLoading) {
+      setIsCheckingAuth(false);
+      if (authData?.user) {
+        setUser(authData.user);
+      }
+    }
+  }, [authData, isLoading]);
+
+  // Logout mutation
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('/api/auth/logout', {
+        method: 'POST',
+      });
+      return response.ok;
+    },
+    onSuccess: () => {
+      console.log('User logged out');
+      setUser(null);
+      setCurrentView('jobform');
+      setCurrentJobFile(null);
+      queryClient.clear(); // Clear all cached queries
+    },
+    onError: (error) => {
+      console.error('Logout error:', error);
+      // Force logout even if API call fails
+      setUser(null);
+      setCurrentView('jobform');
+      setCurrentJobFile(null);
+      queryClient.clear();
+    }
+  });
 
   const handleLogin = (userData: User) => {
     console.log('User logged in:', userData);
@@ -32,10 +89,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    console.log('User logged out');
-    setUser(null);
-    setCurrentView('jobform');
-    setCurrentJobFile(null);
+    logoutMutation.mutate();
   };
 
   const handleLoadJobFile = (file: any) => {
@@ -74,16 +128,21 @@ function App() {
     // todo: implement job file deletion
   };
 
+  // Show loading spinner while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="text-lg font-medium">Loading...</div>
+          <div className="text-sm text-muted-foreground mt-2">Checking authentication</div>
+        </div>
+      </div>
+    );
+  }
+
   // Show login form if no user is logged in
   if (!user) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <LoginForm onLogin={handleLogin} />
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
-    );
+    return <LoginForm onLogin={handleLogin} />;
   }
 
   // Main application views
@@ -187,11 +246,17 @@ function App() {
   };
 
   return (
+    <div className="min-h-screen bg-background">
+      {renderCurrentView()}
+    </div>
+  );
+}
+
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="min-h-screen bg-background">
-          {renderCurrentView()}
-        </div>
+        <AppContent />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
