@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Q'go Cargo - Job File Management System</title>
+    <meta name="description" content="Q'go Cargo Job File Management System - Manage shipping documents, client information, and financial tracking with KWD currency support">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚢</text></svg>">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/styles.css">
+    
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <h2>Q'go Cargo</h2>
+            <p>Loading Job File Management System...</p>
+        </div>
+    </div>
+
+    <!-- Main Application Container -->
+    <div id="app" class="app" style="display: none;">
+        <!-- Navigation Bar -->
+        <nav id="navbar" class="navbar" style="display: none;">
+            <div class="navbar-content">
+                <div class="navbar-brand">
+                    <i class="fas fa-ship"></i>
+                    <span>Q'go Cargo</span>
+                </div>
+                
+                <div class="navbar-menu">
+                    <a href="#/dashboard" class="nav-link" data-route="dashboard">
+                        <i class="fas fa-chart-dashboard"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="#/jobs" class="nav-link" data-route="jobs">
+                        <i class="fas fa-file-lines"></i>
+                        <span>Job Files</span>
+                    </a>
+                    <a href="#/clients" class="nav-link" data-route="clients">
+                        <i class="fas fa-building"></i>
+                        <span>Clients</span>
+                    </a>
+                    <a href="#/analytics" class="nav-link" data-route="analytics" data-role="checker,admin">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Analytics</span>
+                    </a>
+                    <a href="#/admin" class="nav-link" data-route="admin" data-role="admin">
+                        <i class="fas fa-cog"></i>
+                        <span>Admin Panel</span>
+                    </a>
+                </div>
+                
+                <div class="navbar-user">
+                    <div class="user-info" id="user-info">
+                        <span class="user-name" id="user-name"></span>
+                        <span class="user-role" id="user-role"></span>
+                    </div>
+                    <div class="user-menu">
+                        <button class="user-menu-btn" id="user-menu-btn">
+                            <i class="fas fa-user-circle"></i>
+                        </button>
+                        <div class="user-dropdown" id="user-dropdown">
+                            <a href="#/profile" data-testid="link-profile">
+                                <i class="fas fa-user"></i> Profile
+                            </a>
+                            <a href="#" id="logout-btn" data-testid="button-logout">
+                                <i class="fas fa-sign-out-alt"></i> Logout
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main id="main-content" class="main-content">
+            <!-- Dynamic content will be loaded here -->
+        </main>
+        
+        <!-- Toast Notifications -->
+        <div id="toast-container" class="toast-container"></div>
+        
+        <!-- Modal Overlay -->
+        <div id="modal-overlay" class="modal-overlay">
+            <div class="modal-content" id="modal-content">
+                <!-- Dynamic modal content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Page Template -->
+    <template id="login-template">
+        <div class="login-container">
+            <div class="login-card">
+                <div class="login-header">
+                    <div class="brand">
+                        <i class="fas fa-ship"></i>
+                        <h1>Q'go Cargo</h1>
+                    </div>
+                    <p class="subtitle">Job File Management System</p>
+                </div>
+                
+                <form id="login-form" class="login-form">
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            required 
+                            placeholder="Enter your email"
+                            data-testid="input-email"
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            required 
+                            placeholder="Enter your password"
+                            data-testid="input-password"
+                        >
+                    </div>
+                    
+                    <button type="submit" class="login-btn" data-testid="button-login">
+                        <i class="fas fa-sign-in-alt"></i>
+                        Sign In
+                    </button>
+                </form>
+                
+                <div class="login-footer">
+                    <p>&copy; 2025 Q'go Cargo. All rights reserved.</p>
+                    <p class="version">Version 2.0 - HTML/PHP Edition</p>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Dashboard Template -->
+    <template id="dashboard-template">
+        <div class="dashboard">
+            <div class="page-header">
+                <h1>Dashboard</h1>
+                <div class="page-actions">
+                    <a href="#/jobs/create" class="btn btn-primary" data-testid="button-create-job">
+                        <i class="fas fa-plus"></i>
+                        New Job File
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-file-lines"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="total-jobs">0</h3>
+                        <p>Total Job Files</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="pending-jobs">0</h3>
+                        <p>Pending Jobs</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="approved-jobs">0</h3>
+                        <p>Approved Jobs</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-coins"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3 id="total-profit">0.000 KWD</h3>
+                        <p>Total Profit</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Activity -->
+            <div class="dashboard-section">
+                <h2>Recent Job Files</h2>
+                <div id="recent-jobs" class="jobs-list">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Job Files List Template -->
+    <template id="jobs-list-template">
+        <div class="jobs-page">
+            <div class="page-header">
+                <h1>Job Files</h1>
+                <div class="page-actions">
+                    <div class="search-box">
+                        <input 
+                            type="text" 
+                            id="jobs-search" 
+                            placeholder="Search job files..." 
+                            data-testid="input-search-jobs"
+                        >
+                        <i class="fas fa-search"></i>
+                    </div>
+                    
+                    <select id="jobs-status-filter" data-testid="select-status-filter">
+                        <option value="all">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="checked">Checked</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                    </select>
+                    
+                    <a href="#/jobs/create" class="btn btn-primary" data-testid="button-create-job">
+                        <i class="fas fa-plus"></i>
+                        New Job File
+                    </a>
+                </div>
+            </div>
+            
+            <div class="jobs-table-container">
+                <table id="jobs-table" class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Job File No.</th>
+                            <th>Opening Date</th>
+                            <th>Shipper</th>
+                            <th>Consignee</th>
+                            <th>Total (KWD)</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="jobs-table-body">
+                        <!-- Dynamic content -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div id="jobs-pagination" class="pagination">
+                <!-- Dynamic pagination -->
+            </div>
+        </div>
+    </template>
+
+    <!-- Job File Form Template -->
+    <template id="job-form-template">
+        <div class="job-form-page">
+            <div class="page-header">
+                <h1 id="form-title">Create New Job File</h1>
+                <div class="page-actions">
+                    <a href="#/jobs" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to Jobs
+                    </a>
+                </div>
+            </div>
+            
+            <form id="job-form" class="job-form">
+                <!-- Basic Information -->
+                <div class="form-section">
+                    <h3>Basic Information</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="job_file_no">Job File No. *</label>
+                            <input type="text" id="job_file_no" name="job_file_no" required data-testid="input-job-file-no">
+                        </div>
+                        <div class="form-group">
+                            <label for="opening_date">Opening Date *</label>
+                            <input type="datetime-local" id="opening_date" name="opening_date" required data-testid="input-opening-date">
+                        </div>
+                        <div class="form-group">
+                            <label for="billing_date">Billing Date</label>
+                            <input type="datetime-local" id="billing_date" name="billing_date" data-testid="input-billing-date">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Shipper Information -->
+                <div class="form-section">
+                    <h3>Shipper Information</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="shipper_name">Shipper Name *</label>
+                            <input type="text" id="shipper_name" name="shipper_name" required data-testid="input-shipper-name">
+                        </div>
+                        <div class="form-group">
+                            <label for="shipper_contact">Contact</label>
+                            <input type="text" id="shipper_contact" name="shipper_contact" data-testid="input-shipper-contact">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="shipper_address">Address</label>
+                        <textarea id="shipper_address" name="shipper_address" rows="2" data-testid="input-shipper-address"></textarea>
+                    </div>
+                </div>
+                
+                <!-- Consignee Information -->
+                <div class="form-section">
+                    <h3>Consignee Information</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="consignee_name">Consignee Name *</label>
+                            <input type="text" id="consignee_name" name="consignee_name" required data-testid="input-consignee-name">
+                        </div>
+                        <div class="form-group">
+                            <label for="consignee_contact">Contact</label>
+                            <input type="text" id="consignee_contact" name="consignee_contact" data-testid="input-consignee-contact">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="consignee_address">Address</label>
+                        <textarea id="consignee_address" name="consignee_address" rows="2" data-testid="input-consignee-address"></textarea>
+                    </div>
+                </div>
+                
+                <!-- Transportation Details -->
+                <div class="form-section">
+                    <h3>Transportation Details</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="vessel">Vessel</label>
+                            <input type="text" id="vessel" name="vessel" data-testid="input-vessel">
+                        </div>
+                        <div class="form-group">
+                            <label for="voyage">Voyage</label>
+                            <input type="text" id="voyage" name="voyage" data-testid="input-voyage">
+                        </div>
+                        <div class="form-group">
+                            <label for="container_no">Container No.</label>
+                            <input type="text" id="container_no" name="container_no" data-testid="input-container-no">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="pol">Port of Loading</label>
+                            <input type="text" id="pol" name="pol" data-testid="input-pol">
+                        </div>
+                        <div class="form-group">
+                            <label for="pod">Port of Discharge</label>
+                            <input type="text" id="pod" name="pod" data-testid="input-pod">
+                        </div>
+                        <div class="form-group">
+                            <label for="container_size">Container Size</label>
+                            <select id="container_size" name="container_size" data-testid="select-container-size">
+                                <option value="">Select size</option>
+                                <option value="20'">20 feet</option>
+                                <option value="40'">40 feet</option>
+                                <option value="40'HC">40 feet High Cube</option>
+                                <option value="45'">45 feet</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Financial Items -->
+                <div class="form-section">
+                    <h3>Financial Items</h3>
+                    <div class="items-section">
+                        <div class="items-header">
+                            <h4>Line Items</h4>
+                            <button type="button" id="add-item-btn" class="btn btn-secondary" data-testid="button-add-item">
+                                <i class="fas fa-plus"></i>
+                                Add Item
+                            </button>
+                        </div>
+                        <div id="items-container" class="items-container">
+                            <!-- Dynamic items -->
+                        </div>
+                        <div class="totals-section">
+                            <div class="total-row">
+                                <span>Total Sell:</span>
+                                <span id="total-sell">0.000 KWD</span>
+                            </div>
+                            <div class="total-row">
+                                <span>Total Cost:</span>
+                                <span id="total-cost">0.000 KWD</span>
+                            </div>
+                            <div class="total-row total-profit">
+                                <span>Total Profit:</span>
+                                <span id="total-profit">0.000 KWD</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Notes -->
+                <div class="form-section">
+                    <h3>Additional Information</h3>
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea id="description" name="description" rows="3" data-testid="input-description"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="notes">Notes</label>
+                        <textarea id="notes" name="notes" rows="3" data-testid="input-notes"></textarea>
+                    </div>
+                </div>
+                
+                <!-- Form Actions -->
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="history.back()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" data-testid="button-save-job">
+                        <i class="fas fa-save"></i>
+                        Save Job File
+                    </button>
+                </div>
+            </form>
+        </div>
+    </template>
+
+    <!-- JavaScript Files -->
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/router.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/jobs.js"></script>
+    <script src="js/clients.js"></script>
+    <script src="js/analytics.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
