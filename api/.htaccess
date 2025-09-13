@@ -1,0 +1,70 @@
+# Q'go Cargo API - Shared Hosting .htaccess
+# Job File Management System - PHP/MySQL Edition
+
+# Enable URL rewriting
+RewriteEngine On
+
+# Security headers
+<IfModule mod_headers.c>
+    # Prevent direct access to PHP files
+    <Files "*.php">
+        Header always set X-Content-Type-Options "nosniff"
+        Header always set X-Frame-Options "DENY"
+        Header always set X-XSS-Protection "1; mode=block"
+    </Files>
+    
+    # CORS headers for API endpoints
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+    Header always set Access-Control-Allow-Credentials "true"
+</IfModule>
+
+# Handle CORS preflight requests
+RewriteRule ^(.*)$ - [E=HTTP_ORIGIN:%{HTTP:Origin}]
+RewriteRule ^(.*)$ - [E=HTTP_ACCESS_CONTROL_REQUEST_METHOD:%{HTTP:Access-Control-Request-Method}]
+RewriteRule ^(.*)$ - [E=HTTP_ACCESS_CONTROL_REQUEST_HEADERS:%{HTTP:Access-Control-Request-Headers}]
+
+# Set CORS origin for allowed domains
+RewriteCond %{HTTP:Origin} ^https?://(localhost|127\.0\.0\.1|.*\.replit\.app|.*\.hostinger\.|.*\.qgo-cargo\.com)(:[0-9]+)?$
+RewriteRule ^(.*)$ - [E=CORS_ORIGIN:%{HTTP:Origin}]
+Header always set Access-Control-Allow-Origin "%{CORS_ORIGIN}e" env=CORS_ORIGIN
+
+# Route all API requests through index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Handle OPTIONS requests for CORS
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Protect sensitive files
+<Files "config.php">
+    Require all denied
+</Files>
+
+<Files "db.php">
+    Require all denied
+</Files>
+
+<Files ".htaccess">
+    Require all denied
+</Files>
+
+# Prevent access to database files
+<FilesMatch "\.(sql|db|sqlite)$">
+    Require all denied
+</FilesMatch>
+
+# Security: Prevent access to directories
+Options -Indexes
+
+# PHP security settings
+<IfModule mod_php.c>
+    php_value expose_php Off
+    php_value register_globals Off
+    php_value magic_quotes_gpc Off
+    php_value session.cookie_httponly 1
+    php_value session.cookie_secure 1
+    php_value session.use_only_cookies 1
+</IfModule>

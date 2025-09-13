@@ -1,26 +1,20 @@
 <?php
 /**
- * Main API Router
- * Job File Management System
+ * Main API Router - Shared Hosting Compatible
+ * Job File Management System - PHP/MySQL Edition
  */
 
-// Start session with secure settings
-ini_set('session.cookie_httponly', 1);
-ini_set('session.use_only_cookies', 1);
-ini_set('session.cookie_samesite', 'Lax');
+// Define API access constant before including config
+define('API_ACCESS', true);
 
-if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
-    ini_set('session.cookie_secure', 1);
-}
-
-session_start();
+// Include configuration first
+require_once 'config.php';
 
 // Include dependencies
 require_once 'db.php';
 require_once 'utils.php';
 
-// Enable CORS
-enableCORS();
+// Session already started in config.php, no need to start again
 
 // Handle preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
