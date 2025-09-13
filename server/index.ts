@@ -1,10 +1,50 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import { pool } from "./db";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Validate session secret
+if (!process.env.SESSION_SECRET) {
+  throw new Error(
+    "SESSION_SECRET environment variable must be set for secure sessions"
+  );
+}
+
+if (process.env.SESSION_SECRET.length < 32) {
+  throw new Error(
+    "SESSION_SECRET must be at least 32 characters long for security"
+  );
+}
+
+// Configure session store with PostgreSQL
+const PgSession = connectPgSimple(session);
+const sessionStore = new PgSession({
+  pool: pool,
+  tableName: 'session',
+  createTableIfMissing: true,
+});
+
+// Configure session middleware with enhanced security
+app.use(session({
+  store: sessionStore,
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  rolling: true, // Reset expiration on activity
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true, // Prevent XSS attacks
+    sameSite: 'lax', // CSRF protection
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  },
+  name: 'sessionId', // Don't use default 'connect.sid'
+}));
 
 app.use((req, res, next) => {
   const start = Date.now();
