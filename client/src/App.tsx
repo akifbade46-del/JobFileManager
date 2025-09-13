@@ -1,0 +1,201 @@
+import { useState } from "react";
+import { queryClient } from "./lib/queryClient";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import LoginForm from "@/components/LoginForm";
+import Header from "@/components/Header";
+import JobFileForm from "@/components/JobFileForm";
+import JobFileManager from "@/components/JobFileManager";
+import Analytics from "@/components/Analytics";
+import AdminPanel from "@/components/AdminPanel";
+import ClientManager from "@/components/ClientManager";
+import { FileText, Users, BarChart3 } from "lucide-react";
+
+interface User {
+  email: string;
+  name: string;
+  role: 'admin' | 'checker' | 'user';
+}
+
+type View = 'jobform' | 'filemanager' | 'analytics' | 'adminpanel' | 'clientmanager';
+
+function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [currentView, setCurrentView] = useState<View>('jobform');
+  const [currentJobFile, setCurrentJobFile] = useState(null);
+
+  const handleLogin = (userData: User) => {
+    console.log('User logged in:', userData);
+    setUser(userData);
+  };
+
+  const handleLogout = () => {
+    console.log('User logged out');
+    setUser(null);
+    setCurrentView('jobform');
+    setCurrentJobFile(null);
+  };
+
+  const handleLoadJobFile = (file: any) => {
+    console.log('Loading job file:', file.jobFileNo);
+    setCurrentJobFile(file);
+    setCurrentView('jobform');
+  };
+
+  const handleSaveJobFile = (data: any) => {
+    console.log('Saving job file:', data.jobFileNo);
+    // todo: implement API call to save job file
+  };
+
+  const handleCheckJobFile = () => {
+    console.log('Checking job file');
+    // todo: implement job file checking logic
+  };
+
+  const handleApproveJobFile = () => {
+    console.log('Approving job file');
+    // todo: implement job file approval logic
+  };
+
+  const handleRejectJobFile = (reason: string) => {
+    console.log('Rejecting job file:', reason);
+    // todo: implement job file rejection logic
+  };
+
+  const handlePreviewJobFile = (file: any) => {
+    console.log('Previewing job file:', file.jobFileNo);
+    // todo: implement job file preview modal
+  };
+
+  const handleDeleteJobFile = (file: any) => {
+    console.log('Deleting job file:', file.jobFileNo);
+    // todo: implement job file deletion
+  };
+
+  // Show login form if no user is logged in
+  if (!user) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <LoginForm onLogin={handleLogin} />
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
+
+  // Main application views
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case 'filemanager':
+        return (
+          <JobFileManager
+            user={user}
+            onLoadFile={handleLoadJobFile}
+            onPreviewFile={handlePreviewJobFile}
+            onDeleteFile={user.role === 'admin' ? handleDeleteJobFile : undefined}
+          />
+        );
+      
+      case 'analytics':
+        return (
+          <Analytics
+            onClose={() => setCurrentView('jobform')}
+          />
+        );
+      
+      case 'adminpanel':
+        return user.role === 'admin' ? (
+          <AdminPanel
+            onClose={() => setCurrentView('jobform')}
+          />
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Access denied. Admin privileges required.</p>
+          </div>
+        );
+      
+      case 'clientmanager':
+        return (
+          <ClientManager
+            onClose={() => setCurrentView('jobform')}
+            onSelectClient={(client, type) => {
+              console.log('Selected client:', client.name, 'as', type);
+              // todo: populate job file form with selected client
+              setCurrentView('jobform');
+            }}
+          />
+        );
+      
+      default: // 'jobform'
+        return (
+          <div className="max-w-6xl mx-auto p-4 space-y-6">
+            <Header
+              user={user}
+              onLogout={handleLogout}
+              onOpenAnalytics={() => setCurrentView('analytics')}
+              onOpenAdminPanel={user.role === 'admin' ? () => setCurrentView('adminpanel') : undefined}
+              onOpenActivityLog={() => console.log('Open activity log - todo: implement')}
+            />
+            
+            {/* Quick Actions */}
+            <div className="flex justify-center gap-4 mb-8">
+              <Button
+                data-testid="button-open-clients"
+                onClick={() => setCurrentView('clientmanager')}
+                className="bg-cyan-600 hover:bg-cyan-700 gap-2"
+                size="lg"
+              >
+                <Users className="h-5 w-5" />
+                Manage Clients
+              </Button>
+              
+              <Button
+                data-testid="button-open-file-manager"
+                onClick={() => setCurrentView('filemanager')}
+                className="bg-blue-600 hover:bg-blue-700 gap-2"
+                size="lg"
+              >
+                <FileText className="h-5 w-5" />
+                Browse Files
+              </Button>
+              
+              <Button
+                data-testid="button-open-analytics-quick"
+                onClick={() => setCurrentView('analytics')}
+                className="bg-teal-600 hover:bg-teal-700 gap-2"
+                size="lg"
+              >
+                <BarChart3 className="h-5 w-5" />
+                View Analytics
+              </Button>
+            </div>
+            
+            <JobFileForm
+              user={user}
+              initialData={currentJobFile}
+              onSave={handleSaveJobFile}
+              onCheck={user.role === 'checker' ? handleCheckJobFile : undefined}
+              onApprove={user.role === 'admin' ? handleApproveJobFile : undefined}
+              onReject={user.role === 'admin' ? handleRejectJobFile : undefined}
+            />
+          </div>
+        );
+    }
+  };
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <div className="min-h-screen bg-background">
+          {renderCurrentView()}
+        </div>
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
+
+export default App;
