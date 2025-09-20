@@ -46,6 +46,47 @@ window.Analytics = {
                 
                 <!-- Charts Section -->
                 <div class="analytics-section">
+                    <!-- Filter Controls -->
+                    <div class="analytics-filters">
+                        <div class="filter-group">
+                            <label for="freight-mode-filter">Freight Mode:</label>
+                            <select id="freight-mode-filter" data-testid="select-freight-mode-filter">
+                                <option value="">All Modes</option>
+                                <option value="Sea Freight">Sea Freight</option>
+                                <option value="Air Freight">Air Freight</option>
+                                <option value="Land Freight">Land Freight</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="product-type-filter">Product Type:</label>
+                            <select id="product-type-filter" data-testid="select-product-type-filter">
+                                <option value="">All Types</option>
+                                <option value="Air Freight">Air Freight</option>
+                                <option value="Sea Freight">Sea Freight</option>
+                                <option value="Land Freight">Land Freight</option>
+                                <option value="Others">Others</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="salesman-filter">Salesman:</label>
+                            <select id="salesman-filter" data-testid="select-salesman-filter">
+                                <option value="">All Salesmen</option>
+                            </select>
+                        </div>
+                        
+                        <button class="btn btn-secondary" onclick="Analytics.applyFilters()" data-testid="button-apply-filters">
+                            <i class="fas fa-filter"></i>
+                            Apply Filters
+                        </button>
+                        
+                        <button class="btn btn-primary" onclick="Analytics.exportToPDF()" data-testid="button-export-pdf">
+                            <i class="fas fa-file-pdf"></i>
+                            Export PDF
+                        </button>
+                    </div>
+                    
                     <div class="analytics-grid">
                         <!-- Jobs Overview Chart -->
                         <div class="chart-card">
@@ -62,7 +103,27 @@ window.Analytics = {
                             <h3>Monthly Performance</h3>
                             <div class="chart-container">
                                 <div id="monthly-chart" class="chart-placeholder">
-                                    <div id="monthly-chart-data"></div>
+                                    <canvas id="monthly-chart-canvas"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Top Salesmen Chart -->
+                        <div class="chart-card">
+                            <h3>Top Salesmen by Revenue</h3>
+                            <div class="chart-container">
+                                <div id="salesmen-chart" class="chart-placeholder">
+                                    <canvas id="salesmen-chart-canvas"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Product Type Breakdown -->
+                        <div class="chart-card">
+                            <h3>Product Type Breakdown</h3>
+                            <div class="chart-container">
+                                <div id="product-chart" class="chart-placeholder">
+                                    <canvas id="product-chart-canvas"></canvas>
                                 </div>
                             </div>
                         </div>
@@ -77,12 +138,32 @@ window.Analytics = {
                             </div>
                         </div>
                         
+                        <!-- Average Completion Time -->
+                        <div class="chart-card">
+                            <h3>Average Job Completion Time</h3>
+                            <div class="chart-container">
+                                <div id="completion-time-chart" class="chart-placeholder">
+                                    <div id="completion-time-data"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <!-- Top Clients -->
                         <div class="chart-card">
                             <h3>Top Performing Clients</h3>
                             <div class="chart-container">
                                 <div id="clients-list" class="clients-analytics">
                                     <!-- Dynamic content -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Freight Mode Stats -->
+                        <div class="chart-card">
+                            <h3>Freight Mode Statistics</h3>
+                            <div class="chart-container">
+                                <div id="freight-mode-chart" class="chart-placeholder">
+                                    <canvas id="freight-mode-chart-canvas"></canvas>
                                 </div>
                             </div>
                         </div>
@@ -150,13 +231,22 @@ window.Analytics = {
                 date_from: this.getDateFromPeriod(period) 
             } : {};
             
-            const [summary, monthly, status, clients, users] = await Promise.all([
+            const [summary, monthly, status, clients, users, salesmen, productTypes, completionTime, freightModes] = await Promise.all([
                 API.analytics.getSummary(params),
                 API.analytics.getMonthlyData(new Date().getFullYear()),
                 API.analytics.getStatusBreakdown(),
                 API.analytics.getClientStats(),
-                Auth.hasRole('admin') ? API.analytics.getUserStats() : Promise.resolve([])
+                Auth.hasRole('admin') ? API.analytics.getUserStats() : Promise.resolve([]),
+                API.analytics.getSalesmenStats(params),
+                API.analytics.getProductTypeBreakdown(params),
+                API.analytics.getJobCompletionTime(params),
+                API.analytics.getFreightModeStats(params)
             ]);
+            
+            // Store data for filtering
+            this.currentData = {
+                summary, monthly, status, clients, users, salesmen, productTypes, completionTime, freightModes
+            };
             
             // Render all components
             this.renderSummaryStats(summary);
@@ -164,6 +254,11 @@ window.Analytics = {
             this.renderMonthlyChart(monthly);
             this.renderProfitAnalysis(summary);
             this.renderTopClients(clients);
+            this.renderSalesmenChart(salesmen);
+            this.renderProductTypeChart(productTypes);
+            this.renderCompletionTimeMetric(completionTime);
+            this.renderFreightModeChart(freightModes);
+            this.populateSalesmenFilter(salesmen);
             this.renderJobsReport();
             this.renderClientsReport(clients);
             
@@ -446,6 +541,413 @@ window.Analytics = {
     },
     
     /**
+     * Render salesmen chart using Chart.js
+     */
+    renderSalesmenChart: function(salesmenData) {
+        const canvas = document.getElementById('salesmen-chart-canvas');
+        if (!canvas) return;
+        
+        // Destroy existing chart
+        if (this.charts.salesmen) {
+            this.charts.salesmen.destroy();
+        }
+        
+        if (!salesmenData || salesmenData.length === 0) {
+            canvas.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No salesman data available</p>';
+            return;
+        }
+        
+        const ctx = canvas.getContext('2d');
+        const topSalesmen = salesmenData.slice(0, 10); // Top 10 salesmen
+        
+        this.charts.salesmen = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: topSalesmen.map(s => s.salesman_name),
+                datasets: [{
+                    label: 'Revenue (KWD)',
+                    data: topSalesmen.map(s => parseFloat(s.total_revenue || 0)),
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }, {
+                    label: 'Profit (KWD)',
+                    data: topSalesmen.map(s => parseFloat(s.total_profit || 0)),
+                    backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Top Salesmen Performance'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Amount (KWD)'
+                        }
+                    }
+                }
+            }
+        });
+    },
+    
+    /**
+     * Render product type breakdown chart
+     */
+    renderProductTypeChart: function(productData) {
+        const canvas = document.getElementById('product-chart-canvas');
+        if (!canvas) return;
+        
+        // Destroy existing chart
+        if (this.charts.productType) {
+            this.charts.productType.destroy();
+        }
+        
+        if (!productData || productData.length === 0) {
+            canvas.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No product type data available</p>';
+            return;
+        }
+        
+        const ctx = canvas.getContext('2d');
+        
+        this.charts.productType = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: productData.map(p => p.product_type),
+                datasets: [{
+                    data: productData.map(p => parseFloat(p.total_profit || 0)),
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(255, 205, 86, 0.6)',
+                        'rgba(75, 192, 192, 0.6)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 205, 86, 1)',
+                        'rgba(75, 192, 192, 1)'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Profit by Product Type'
+                    },
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    },
+    
+    /**
+     * Render job completion time metrics
+     */
+    renderCompletionTimeMetric: function(completionData) {
+        const container = document.getElementById('completion-time-data');
+        if (!container) return;
+        
+        if (!completionData || completionData.avg_completion_days === 0) {
+            container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No completion data available</p>';
+            return;
+        }
+        
+        const metricsHTML = `
+            <div class="completion-metrics">
+                <div class="metric-item" style="text-align: center; margin-bottom: 2rem;">
+                    <div style="font-size: 3rem; font-weight: bold; color: var(--primary); margin-bottom: 0.5rem;">
+                        ${completionData.avg_completion_days} days
+                    </div>
+                    <div style="font-size: 1.2rem; color: var(--text-secondary);">
+                        Average Completion Time
+                    </div>
+                </div>
+                
+                <div class="metric-details" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="detail-item" style="background: var(--bg-secondary); padding: 1rem; border-radius: var(--radius-md); text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 600; color: var(--status-approved);">
+                            ${completionData.fastest_completion_days} days
+                        </div>
+                        <div style="font-size: 0.875rem; color: var(--text-muted);">
+                            Fastest
+                        </div>
+                    </div>
+                    
+                    <div class="detail-item" style="background: var(--bg-secondary); padding: 1rem; border-radius: var(--radius-md); text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 600; color: var(--status-rejected);">
+                            ${completionData.slowest_completion_days} days
+                        </div>
+                        <div style="font-size: 0.875rem; color: var(--text-muted);">
+                            Slowest
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1.5rem; text-align: center; color: var(--text-secondary); font-size: 0.875rem;">
+                    Based on ${completionData.total_completed_jobs} completed jobs
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = metricsHTML;
+    },
+    
+    /**
+     * Render freight mode chart
+     */
+    renderFreightModeChart: function(freightData) {
+        const canvas = document.getElementById('freight-mode-chart-canvas');
+        if (!canvas) return;
+        
+        // Destroy existing chart
+        if (this.charts.freightMode) {
+            this.charts.freightMode.destroy();
+        }
+        
+        if (!freightData || freightData.length === 0) {
+            canvas.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No freight mode data available</p>';
+            return;
+        }
+        
+        const ctx = canvas.getContext('2d');
+        
+        this.charts.freightMode = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: freightData.map(f => f.freight_mode),
+                datasets: [{
+                    data: freightData.map(f => parseInt(f.total_jobs)),
+                    backgroundColor: [
+                        'rgba(255, 159, 64, 0.6)',
+                        'rgba(153, 102, 255, 0.6)',
+                        'rgba(255, 205, 86, 0.6)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 205, 86, 1)'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Jobs by Freight Mode'
+                    },
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    },
+    
+    /**
+     * Populate salesmen filter dropdown
+     */
+    populateSalesmenFilter: function(salesmenData) {
+        const select = document.getElementById('salesman-filter');
+        if (!select || !salesmenData) return;
+        
+        // Clear existing options (except the first "All Salesmen")
+        while (select.children.length > 1) {
+            select.removeChild(select.lastChild);
+        }
+        
+        // Add salesman options
+        salesmenData.forEach(salesman => {
+            const option = document.createElement('option');
+            option.value = salesman.salesman_name;
+            option.textContent = salesman.salesman_name;
+            select.appendChild(option);
+        });
+    },
+    
+    /**
+     * Apply filters to analytics data
+     */
+    applyFilters: function() {
+        const freightMode = document.getElementById('freight-mode-filter').value;
+        const productType = document.getElementById('product-type-filter').value;
+        const salesman = document.getElementById('salesman-filter').value;
+        
+        // Create filter parameters
+        const filterParams = {};
+        if (freightMode) filterParams.freight_mode = freightMode;
+        if (productType) filterParams.product_type = productType;
+        if (salesman) filterParams.salesman = salesman;
+        
+        // Show loading message
+        UI.showToast('Applying filters...', 'info');
+        
+        // Reload data with filters
+        this.loadAnalyticsData();
+    },
+    
+    /**
+     * Export analytics to PDF
+     */
+    exportToPDF: async function() {
+        try {
+            UI.showToast('Generating PDF report...', 'info');
+            
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF();
+            
+            // Add title
+            pdf.setFontSize(20);
+            pdf.text('Analytics Report', 20, 30);
+            
+            // Add date
+            pdf.setFontSize(12);
+            pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 45);
+            
+            // Add summary stats if available
+            if (this.currentData && this.currentData.summary) {
+                const summary = this.currentData.summary;
+                let yPos = 65;
+                
+                pdf.setFontSize(16);
+                pdf.text('Summary Statistics', 20, yPos);
+                yPos += 20;
+                
+                pdf.setFontSize(12);
+                pdf.text(`Total Jobs: ${summary.jobs.total}`, 20, yPos);
+                yPos += 15;
+                pdf.text(`Approved Jobs: ${summary.jobs.approved}`, 20, yPos);
+                yPos += 15;
+                pdf.text(`Total Revenue: ${summary.financial.total_revenue}`, 20, yPos);
+                yPos += 15;
+                pdf.text(`Total Profit: ${summary.financial.total_profit}`, 20, yPos);
+                yPos += 15;
+                pdf.text(`Profit Margin: ${summary.financial.profit_margin}`, 20, yPos);
+            }
+            
+            // Save the PDF
+            pdf.save('analytics-report.pdf');
+            UI.showToast('PDF report downloaded successfully!', 'success');
+            
+        } catch (error) {
+            console.error('PDF export error:', error);
+            UI.showToast('Failed to generate PDF report', 'error');
+        }
+    },
+    
+    /**
+     * Enhanced monthly chart with Chart.js
+     */
+    renderMonthlyChart: function(monthlyData) {
+        const canvas = document.getElementById('monthly-chart-canvas');
+        if (!canvas) {
+            // Fallback to original HTML chart
+            return this.renderMonthlyChartHTML(monthlyData);
+        }
+        
+        // Destroy existing chart
+        if (this.charts.monthly) {
+            this.charts.monthly.destroy();
+        }
+        
+        if (!monthlyData || monthlyData.length === 0) {
+            canvas.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No data available</p>';
+            return;
+        }
+        
+        const ctx = canvas.getContext('2d');
+        
+        this.charts.monthly = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: monthlyData.map(m => m.month_name),
+                datasets: [{
+                    label: 'Total Jobs',
+                    data: monthlyData.map(m => m.total_jobs),
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    yAxisID: 'y'
+                }, {
+                    label: 'Revenue (KWD)',
+                    data: monthlyData.map(m => m.revenue),
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    yAxisID: 'y1'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Monthly Performance Trends'
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Month'
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Number of Jobs'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Revenue (KWD)'
+                        },
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                    }
+                }
+            }
+        });
+    },
+    
+    /**
+     * Fallback HTML monthly chart (original implementation)
+     */
+    renderMonthlyChartHTML: function(monthlyData) {
+        const container = document.getElementById('monthly-chart-data');
+        if (!container) return;
+    
+    /**
      * Show analytics tab
      */
     showTab: function(tabId) {
@@ -611,7 +1113,7 @@ window.Analytics = {
      * Export analytics data
      */
     exportData: function() {
-        UI.showToast('Export functionality coming soon...', 'info');
+        this.exportToPDF();
     }
 };
 
@@ -695,6 +1197,46 @@ analyticsStyle.textContent = `
     .analytics-section h2 {
         margin-bottom: 2rem;
         color: var(--text-primary);
+    }
+    
+    .analytics-filters {
+        background: var(--bg-primary);
+        padding: 1.5rem;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-light);
+        margin-bottom: 2rem;
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        min-width: 120px;
+    }
+    
+    .filter-group label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+    
+    .filter-group select {
+        padding: 0.5rem;
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-md);
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+    
+    .filter-group select:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.2);
     }
 `;
 document.head.appendChild(analyticsStyle);

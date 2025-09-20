@@ -318,6 +318,34 @@ window.API = {
          */
         getProfitAnalysis: function(period = 30) {
             return API.get('/analytics/profit', { period });
+        },
+        
+        /**
+         * Get salesmen statistics
+         */
+        getSalesmenStats: function(params = {}) {
+            return API.get('/analytics/salesmen', params);
+        },
+        
+        /**
+         * Get product type breakdown
+         */
+        getProductTypeBreakdown: function(params = {}) {
+            return API.get('/analytics/product-types', params);
+        },
+        
+        /**
+         * Get job completion time metrics
+         */
+        getJobCompletionTime: function(params = {}) {
+            return API.get('/analytics/completion-time', params);
+        },
+        
+        /**
+         * Get freight mode statistics
+         */
+        getFreightModeStats: function(params = {}) {
+            return API.get('/analytics/freight-modes', params);
         }
     },
     

@@ -43,6 +43,18 @@ class AnalyticsAPI {
             case 'profit':
                 $this->getProfitAnalysis();
                 break;
+            case 'salesmen':
+                $this->getSalesmenStats();
+                break;
+            case 'product-types':
+                $this->getProductTypeBreakdown();
+                break;
+            case 'completion-time':
+                $this->getJobCompletionTime();
+                break;
+            case 'freight-modes':
+                $this->getFreightModeStats();
+                break;
             default:
                 respond(['error' => 'Invalid analytics endpoint'], 400);
         }
@@ -280,6 +292,194 @@ class AnalyticsAPI {
                 'period_days' => (int)$period
             ]
         ]);
+    }
+    
+    /**
+     * Get salesmen statistics
+     */
+    public function getSalesmenStats() {
+        $params = getQueryParams();
+        $dateFrom = $params['date_from'] ?? null;
+        $dateTo = $params['date_to'] ?? null;
+        
+        // Build date filter
+        $dateFilter = '';
+        $dateParams = [];
+        
+        if ($dateFrom) {
+            $dateFilter .= ' AND opening_date >= ?';
+            $dateParams[] = $dateFrom;
+        }
+        
+        if ($dateTo) {
+            $dateFilter .= ' AND opening_date <= ?';
+            $dateParams[] = $dateTo;
+        }
+        
+        // Note: Using notes field to simulate salesman data since it's not in the current schema
+        // In a real implementation, you'd add a salesman field to the job_files table
+        $sql = "
+            SELECT 
+                COALESCE(
+                    SUBSTRING_INDEX(SUBSTRING_INDEX(notes, 'Salesman:', -1), '\n', 1),
+                    'No Salesman'
+                ) as salesman_name,
+                COUNT(*) as total_jobs,
+                SUM(total_sell) as total_revenue,
+                SUM(total_profit) as total_profit,
+                AVG(total_profit) as avg_profit_per_job
+            FROM job_files 
+            WHERE status = 'approved' {$dateFilter}
+            GROUP BY salesman_name
+            ORDER BY total_profit DESC
+            LIMIT 20
+        ";
+        
+        $salesmenData = $this->db->fetchAll($sql, $dateParams);
+        
+        respond($salesmenData);
+    }
+    
+    /**
+     * Get product type breakdown
+     */
+    public function getProductTypeBreakdown() {
+        $params = getQueryParams();
+        $dateFrom = $params['date_from'] ?? null;
+        $dateTo = $params['date_to'] ?? null;
+        
+        // Build date filter
+        $dateFilter = '';
+        $dateParams = [];
+        
+        if ($dateFrom) {
+            $dateFilter .= ' AND opening_date >= ?';
+            $dateParams[] = $dateFrom;
+        }
+        
+        if ($dateTo) {
+            $dateFilter .= ' AND opening_date <= ?';
+            $dateParams[] = $dateTo;
+        }
+        
+        // Note: Using description field to extract product type information
+        // In a real implementation, you'd add product_type field to the job_files table
+        $sql = "
+            SELECT 
+                CASE 
+                    WHEN LOWER(description) LIKE '%air%' OR LOWER(description) LIKE '%flight%' THEN 'Air Freight'
+                    WHEN LOWER(description) LIKE '%sea%' OR LOWER(description) LIKE '%ocean%' OR LOWER(description) LIKE '%ship%' THEN 'Sea Freight'
+                    WHEN LOWER(description) LIKE '%land%' OR LOWER(description) LIKE '%truck%' OR LOWER(description) LIKE '%road%' THEN 'Land Freight'
+                    ELSE 'Others'
+                END as product_type,
+                COUNT(*) as total_jobs,
+                SUM(total_sell) as total_revenue,
+                SUM(total_profit) as total_profit,
+                AVG(total_profit) as avg_profit_per_job
+            FROM job_files 
+            WHERE status = 'approved' {$dateFilter}
+            GROUP BY product_type
+            ORDER BY total_profit DESC
+        ";
+        
+        $productData = $this->db->fetchAll($sql, $dateParams);
+        
+        respond($productData);
+    }
+    
+    /**
+     * Get average job completion time
+     */
+    public function getJobCompletionTime() {
+        $params = getQueryParams();
+        $dateFrom = $params['date_from'] ?? null;
+        $dateTo = $params['date_to'] ?? null;
+        
+        // Build date filter
+        $dateFilter = '';
+        $dateParams = [];
+        
+        if ($dateFrom) {
+            $dateFilter .= ' AND opening_date >= ?';
+            $dateParams[] = $dateFrom;
+        }
+        
+        if ($dateTo) {
+            $dateFilter .= ' AND opening_date <= ?';
+            $dateParams[] = $dateTo;
+        }
+        
+        $sql = "
+            SELECT 
+                AVG(DATEDIFF(
+                    COALESCE(approved_at, rejected_at, checked_at, updated_at),
+                    opening_date
+                )) as avg_completion_days,
+                COUNT(*) as total_completed_jobs,
+                MIN(DATEDIFF(
+                    COALESCE(approved_at, rejected_at, checked_at, updated_at),
+                    opening_date
+                )) as fastest_completion_days,
+                MAX(DATEDIFF(
+                    COALESCE(approved_at, rejected_at, checked_at, updated_at),
+                    opening_date
+                )) as slowest_completion_days
+            FROM job_files 
+            WHERE status IN ('approved', 'rejected') {$dateFilter}
+            AND (approved_at IS NOT NULL OR rejected_at IS NOT NULL)
+        ";
+        
+        $completionData = $this->db->fetchOne($sql, $dateParams);
+        
+        respond([
+            'avg_completion_days' => round($completionData['avg_completion_days'] ?? 0, 1),
+            'total_completed_jobs' => (int)($completionData['total_completed_jobs'] ?? 0),
+            'fastest_completion_days' => (int)($completionData['fastest_completion_days'] ?? 0),
+            'slowest_completion_days' => (int)($completionData['slowest_completion_days'] ?? 0)
+        ]);
+    }
+    
+    /**
+     * Get freight mode statistics (simulated from vessel/transportation data)
+     */
+    public function getFreightModeStats() {
+        $params = getQueryParams();
+        $dateFrom = $params['date_from'] ?? null;
+        $dateTo = $params['date_to'] ?? null;
+        
+        // Build date filter
+        $dateFilter = '';
+        $dateParams = [];
+        
+        if ($dateFrom) {
+            $dateFilter .= ' AND opening_date >= ?';
+            $dateParams[] = $dateFrom;
+        }
+        
+        if ($dateTo) {
+            $dateFilter .= ' AND opening_date <= ?';
+            $dateParams[] = $dateTo;
+        }
+        
+        $sql = "
+            SELECT 
+                CASE 
+                    WHEN vessel IS NOT NULL AND vessel != '' THEN 'Sea Freight'
+                    WHEN pol IS NOT NULL AND pod IS NOT NULL THEN 'Air Freight'
+                    ELSE 'Land Freight'
+                END as freight_mode,
+                COUNT(*) as total_jobs,
+                SUM(total_sell) as total_revenue,
+                SUM(total_profit) as total_profit
+            FROM job_files 
+            WHERE status = 'approved' {$dateFilter}
+            GROUP BY freight_mode
+            ORDER BY total_profit DESC
+        ";
+        
+        $freightData = $this->db->fetchAll($sql, $dateParams);
+        
+        respond($freightData);
     }
 }
 ?>
