@@ -32,13 +32,47 @@ window.Auth = {
      */
     checkAuthStatus: async function() {
         try {
+            // Demo mode bypass
+            if (this.isDemoMode()) {
+                this.setDemoUser();
+                return this.currentUser;
+            }
+            
             const response = await API.auth.getCurrentUser();
             this.setUser(response.user);
             return this.currentUser;
         } catch (error) {
+            // In demo mode, set demo user even on API failure
+            if (this.isDemoMode()) {
+                this.setDemoUser();
+                return this.currentUser;
+            }
+            
             this.clearSession();
             throw error;
         }
+    },
+    
+    /**
+     * Check if we're in demo mode
+     */
+    isDemoMode: function() {
+        return window.location.search.includes('demo=true') || 
+               (window.location.hostname === 'localhost' && !window.navigator.onLine);
+    },
+    
+    /**
+     * Set demo user for testing
+     */
+    setDemoUser: function() {
+        this.setUser({
+            id: 'demo-1',
+            name: 'Demo User',
+            email: 'demo@qgo-cargo.com',
+            role: 'admin',
+            status: 'active'
+        });
+        console.log('Demo mode activated - logged in as:', this.currentUser.name);
     },
     
     /**

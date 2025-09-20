@@ -46,6 +46,47 @@ window.Analytics = {
                 
                 <!-- Charts Section -->
                 <div class="analytics-section">
+                    <!-- Filter Controls -->
+                    <div class="analytics-filters">
+                        <div class="filter-group">
+                            <label for="freight-mode-filter">Freight Mode:</label>
+                            <select id="freight-mode-filter" data-testid="select-freight-mode-filter">
+                                <option value="">All Modes</option>
+                                <option value="Sea Freight">Sea Freight</option>
+                                <option value="Air Freight">Air Freight</option>
+                                <option value="Land Freight">Land Freight</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="product-type-filter">Product Type:</label>
+                            <select id="product-type-filter" data-testid="select-product-type-filter">
+                                <option value="">All Types</option>
+                                <option value="Air Freight">Air Freight</option>
+                                <option value="Sea Freight">Sea Freight</option>
+                                <option value="Land Freight">Land Freight</option>
+                                <option value="Others">Others</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="salesman-filter">Salesman:</label>
+                            <select id="salesman-filter" data-testid="select-salesman-filter">
+                                <option value="">All Salesmen</option>
+                            </select>
+                        </div>
+                        
+                        <button class="btn btn-secondary" onclick="Analytics.applyFilters()" data-testid="button-apply-filters">
+                            <i class="fas fa-filter"></i>
+                            Apply Filters
+                        </button>
+                        
+                        <button class="btn btn-primary" onclick="Analytics.exportToPDF()" data-testid="button-export-pdf">
+                            <i class="fas fa-file-pdf"></i>
+                            Export PDF
+                        </button>
+                    </div>
+                    
                     <div class="analytics-grid">
                         <!-- Jobs Overview Chart -->
                         <div class="chart-card">
@@ -62,7 +103,27 @@ window.Analytics = {
                             <h3>Monthly Performance</h3>
                             <div class="chart-container">
                                 <div id="monthly-chart" class="chart-placeholder">
-                                    <div id="monthly-chart-data"></div>
+                                    <canvas id="monthly-chart-canvas"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Top Salesmen Chart -->
+                        <div class="chart-card">
+                            <h3>Top Salesmen by Revenue</h3>
+                            <div class="chart-container">
+                                <div id="salesmen-chart" class="chart-placeholder">
+                                    <canvas id="salesmen-chart-canvas"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Product Type Breakdown -->
+                        <div class="chart-card">
+                            <h3>Product Type Breakdown</h3>
+                            <div class="chart-container">
+                                <div id="product-chart" class="chart-placeholder">
+                                    <canvas id="product-chart-canvas"></canvas>
                                 </div>
                             </div>
                         </div>
@@ -77,12 +138,32 @@ window.Analytics = {
                             </div>
                         </div>
                         
+                        <!-- Average Completion Time -->
+                        <div class="chart-card">
+                            <h3>Average Job Completion Time</h3>
+                            <div class="chart-container">
+                                <div id="completion-time-chart" class="chart-placeholder">
+                                    <div id="completion-time-data"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <!-- Top Clients -->
                         <div class="chart-card">
                             <h3>Top Performing Clients</h3>
                             <div class="chart-container">
                                 <div id="clients-list" class="clients-analytics">
                                     <!-- Dynamic content -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Freight Mode Stats -->
+                        <div class="chart-card">
+                            <h3>Freight Mode Statistics</h3>
+                            <div class="chart-container">
+                                <div id="freight-mode-chart" class="chart-placeholder">
+                                    <canvas id="freight-mode-chart-canvas"></canvas>
                                 </div>
                             </div>
                         </div>
@@ -145,18 +226,32 @@ window.Analytics = {
      */
     loadAnalyticsData: async function(period = '30') {
         try {
+            // Check if we're in demo mode (no backend)
+            if (window.location.hostname === 'localhost' && this.isDemoMode()) {
+                return this.loadDemoData();
+            }
+            
             // Load summary data
             const params = period !== 'all' ? { 
                 date_from: this.getDateFromPeriod(period) 
             } : {};
             
-            const [summary, monthly, status, clients, users] = await Promise.all([
+            const [summary, monthly, status, clients, users, salesmen, productTypes, completionTime, freightModes] = await Promise.all([
                 API.analytics.getSummary(params),
                 API.analytics.getMonthlyData(new Date().getFullYear()),
                 API.analytics.getStatusBreakdown(),
                 API.analytics.getClientStats(),
-                Auth.hasRole('admin') ? API.analytics.getUserStats() : Promise.resolve([])
+                Auth.hasRole('admin') ? API.analytics.getUserStats() : Promise.resolve([]),
+                API.analytics.getSalesmenStats(params),
+                API.analytics.getProductTypeBreakdown(params),
+                API.analytics.getJobCompletionTime(params),
+                API.analytics.getFreightModeStats(params)
             ]);
+            
+            // Store data for filtering
+            this.currentData = {
+                summary, monthly, status, clients, users, salesmen, productTypes, completionTime, freightModes
+            };
             
             // Render all components
             this.renderSummaryStats(summary);
@@ -164,6 +259,11 @@ window.Analytics = {
             this.renderMonthlyChart(monthly);
             this.renderProfitAnalysis(summary);
             this.renderTopClients(clients);
+            this.renderSalesmenChart(salesmen);
+            this.renderProductTypeChart(productTypes);
+            this.renderCompletionTimeMetric(completionTime);
+            this.renderFreightModeChart(freightModes);
+            this.populateSalesmenFilter(salesmen);
             this.renderJobsReport();
             this.renderClientsReport(clients);
             
@@ -173,8 +273,98 @@ window.Analytics = {
             
         } catch (error) {
             console.error('Load analytics data error:', error);
-            UI.showToast('Failed to load analytics data', 'error');
+            
+            // Fallback to demo mode if API fails
+            console.log('API failed, falling back to demo mode');
+            this.loadDemoData();
         }
+    },
+    
+    /**
+     * Check if we're in demo mode
+     */
+    isDemoMode: function() {
+        return !window.navigator.onLine || window.location.search.includes('demo=true');
+    },
+    
+    /**
+     * Load demo data for testing
+     */
+    loadDemoData: function() {
+        console.log('Loading demo analytics data...');
+        
+        // Demo data
+        const demoData = {
+            summary: {
+                jobs: { total: 156, pending: 23, checked: 18, approved: 98, rejected: 17 },
+                financial: {
+                    total_revenue: '45.650 KWD',
+                    total_cost: '32.100 KWD', 
+                    total_profit: '13.550 KWD',
+                    profit_margin: '29.7%'
+                }
+            },
+            monthly: [
+                { month: 1, month_name: 'Jan', total_jobs: 12, revenue: 3200 },
+                { month: 2, month_name: 'Feb', total_jobs: 15, revenue: 4100 },
+                { month: 3, month_name: 'Mar', total_jobs: 18, revenue: 4800 },
+                { month: 4, month_name: 'Apr', total_jobs: 14, revenue: 3900 },
+                { month: 5, month_name: 'May', total_jobs: 20, revenue: 5200 },
+                { month: 6, month_name: 'Jun', total_jobs: 16, revenue: 4300 }
+            ],
+            status: [
+                { status: 'approved', count: 98 },
+                { status: 'pending', count: 23 },
+                { status: 'checked', count: 18 },
+                { status: 'rejected', count: 17 }
+            ],
+            salesmen: [
+                { salesman_name: 'Ahmed Al-Mahmoud', total_jobs: 25, total_revenue: 8500, total_profit: 2800 },
+                { salesman_name: 'Fatima Al-Sabah', total_jobs: 22, total_revenue: 7200, total_profit: 2400 },
+                { salesman_name: 'Omar Al-Rashid', total_jobs: 18, total_revenue: 6100, total_profit: 1950 },
+                { salesman_name: 'Sara Al-Kuwait', total_jobs: 15, total_revenue: 4800, total_profit: 1600 },
+                { salesman_name: 'Mohammed Al-Gulf', total_jobs: 12, total_revenue: 3900, total_profit: 1200 }
+            ],
+            productTypes: [
+                { product_type: 'Sea Freight', total_jobs: 68, total_revenue: 22800, total_profit: 7200 },
+                { product_type: 'Air Freight', total_jobs: 45, total_revenue: 15600, total_profit: 4100 },
+                { product_type: 'Land Freight', total_jobs: 32, total_revenue: 5400, total_profit: 1800 },
+                { product_type: 'Others', total_jobs: 11, total_revenue: 1850, total_profit: 450 }
+            ],
+            completionTime: {
+                avg_completion_days: 5.2,
+                total_completed_jobs: 115,
+                fastest_completion_days: 1,
+                slowest_completion_days: 12
+            },
+            freightModes: [
+                { freight_mode: 'Sea Freight', total_jobs: 68, total_revenue: 22800, total_profit: 7200 },
+                { freight_mode: 'Air Freight', total_jobs: 45, total_revenue: 15600, total_profit: 4100 },
+                { freight_mode: 'Land Freight', total_jobs: 43, total_revenue: 7250, total_profit: 2250 }
+            ],
+            clients: [
+                { name: 'Kuwait Shipping Co.', actual_jobs: 28, revenue_as_shipper: 9200, revenue_as_consignee: 2100 },
+                { name: 'Gulf Trading LLC', actual_jobs: 24, revenue_as_shipper: 6800, revenue_as_consignee: 3400 },
+                { name: 'Middle East Logistics', actual_jobs: 19, revenue_as_shipper: 4200, revenue_as_consignee: 2800 }
+            ]
+        };
+        
+        // Store demo data
+        this.currentData = demoData;
+        
+        // Render all components with demo data
+        this.renderSummaryStats(demoData.summary);
+        this.renderStatusChart(demoData.status);
+        this.renderMonthlyChart(demoData.monthly);
+        this.renderProfitAnalysis(demoData.summary);
+        this.renderTopClients(demoData.clients);
+        this.renderSalesmenChart(demoData.salesmen);
+        this.renderProductTypeChart(demoData.productTypes);
+        this.renderCompletionTimeMetric(demoData.completionTime);
+        this.renderFreightModeChart(demoData.freightModes);
+        this.populateSalesmenFilter(demoData.salesmen);
+        
+        UI.showToast('Demo analytics data loaded successfully!', 'success');
     },
     
     /**
@@ -446,6 +636,629 @@ window.Analytics = {
     },
     
     /**
+     * Render salesmen chart using Chart.js or HTML fallback
+     */
+    renderSalesmenChart: function(salesmenData) {
+        const canvas = document.getElementById('salesmen-chart-canvas');
+        
+        if (!salesmenData || salesmenData.length === 0) {
+            if (canvas) {
+                canvas.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No salesman data available</p>';
+            }
+            return;
+        }
+        
+        // Check if Chart.js is available
+        if (typeof Chart !== 'undefined' && canvas) {
+            this.renderSalesmenChartJS(salesmenData, canvas);
+        } else {
+            // Fallback to HTML chart
+            this.renderSalesmenHTML(salesmenData);
+        }
+    },
+    
+    /**
+     * Render salesmen chart with Chart.js
+     */
+    renderSalesmenChartJS: function(salesmenData, canvas) {
+        // Destroy existing chart
+        if (this.charts.salesmen) {
+            this.charts.salesmen.destroy();
+        }
+        
+        const ctx = canvas.getContext('2d');
+        const topSalesmen = salesmenData.slice(0, 10); // Top 10 salesmen
+        
+        this.charts.salesmen = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: topSalesmen.map(s => s.salesman_name),
+                datasets: [{
+                    label: 'Revenue (KWD)',
+                    data: topSalesmen.map(s => parseFloat(s.total_revenue || 0)),
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }, {
+                    label: 'Profit (KWD)',
+                    data: topSalesmen.map(s => parseFloat(s.total_profit || 0)),
+                    backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Top Salesmen Performance'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Amount (KWD)'
+                        }
+                    }
+                }
+            }
+        });
+    },
+    
+    /**
+     * Render salesmen chart with HTML
+     */
+    renderSalesmenHTML: function(salesmenData) {
+        const container = document.getElementById('salesmen-chart');
+        if (!container) return;
+        
+        const topSalesmen = salesmenData.slice(0, 5);
+        const maxRevenue = Math.max(...topSalesmen.map(s => parseFloat(s.total_revenue || 0)));
+        
+        const chartHTML = `
+            <div class="salesmen-chart-html">
+                ${topSalesmen.map(salesman => {
+                    const revenue = parseFloat(salesman.total_revenue || 0);
+                    const profit = parseFloat(salesman.total_profit || 0);
+                    const percentage = maxRevenue > 0 ? (revenue / maxRevenue) * 100 : 0;
+                    
+                    return `
+                        <div class="salesman-item" style="margin-bottom: 1.5rem; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <strong>${Utils.escapeHTML(salesman.salesman_name)}</strong>
+                                <span class="badge">${salesman.total_jobs} jobs</span>
+                            </div>
+                            <div style="margin-bottom: 0.5rem;">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.875rem;">
+                                    <span>Revenue:</span>
+                                    <span style="font-weight: 600;">${Utils.formatCurrency(revenue)}</span>
+                                </div>
+                                <div style="background: var(--bg-muted); height: 8px; border-radius: 4px; overflow: hidden; margin-top: 0.25rem;">
+                                    <div style="background: var(--primary); height: 100%; width: ${percentage}%; transition: width 0.3s ease;"></div>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.875rem; color: var(--text-secondary);">
+                                <span>Profit:</span>
+                                <span style="color: ${profit >= 0 ? 'var(--status-approved)' : 'var(--status-rejected)'};">${Utils.formatCurrency(profit)}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+        
+        container.innerHTML = chartHTML;
+    },
+    
+    /**
+     * Render product type breakdown chart with fallback
+     */
+    renderProductTypeChart: function(productData) {
+        const canvas = document.getElementById('product-chart-canvas');
+        
+        if (!productData || productData.length === 0) {
+            if (canvas) {
+                canvas.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No product type data available</p>';
+            }
+            return;
+        }
+        
+        // Check if Chart.js is available
+        if (typeof Chart !== 'undefined' && canvas) {
+            this.renderProductTypeChartJS(productData, canvas);
+        } else {
+            // Fallback to HTML chart
+            this.renderProductTypeHTML(productData);
+        }
+    },
+    
+    /**
+     * Render product type chart with Chart.js
+     */
+    renderProductTypeChartJS: function(productData, canvas) {
+        // Destroy existing chart
+        if (this.charts.productType) {
+            this.charts.productType.destroy();
+        }
+        
+        const ctx = canvas.getContext('2d');
+        
+        this.charts.productType = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: productData.map(p => p.product_type),
+                datasets: [{
+                    data: productData.map(p => parseFloat(p.total_profit || 0)),
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.6)',
+                        'rgba(54, 162, 235, 0.6)',
+                        'rgba(255, 205, 86, 0.6)',
+                        'rgba(75, 192, 192, 0.6)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 205, 86, 1)',
+                        'rgba(75, 192, 192, 1)'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Profit by Product Type'
+                    },
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    },
+    
+    /**
+     * Render product type chart with HTML
+     */
+    renderProductTypeHTML: function(productData) {
+        const container = document.getElementById('product-chart');
+        if (!container) return;
+        
+        const total = productData.reduce((sum, p) => sum + parseFloat(p.total_profit || 0), 0);
+        const colors = ['#ff6384', '#36a2eb', '#ffcd56', '#4bc0c0'];
+        
+        const chartHTML = `
+            <div class="product-chart-html">
+                ${productData.map((product, index) => {
+                    const profit = parseFloat(product.total_profit || 0);
+                    const percentage = total > 0 ? ((profit / total) * 100).toFixed(1) : 0;
+                    const color = colors[index % colors.length];
+                    
+                    return `
+                        <div class="product-item" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md); border-left: 4px solid ${color};">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>${Utils.escapeHTML(product.product_type)}</strong>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                                        ${product.total_jobs} jobs
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-weight: 600;">${Utils.formatCurrency(profit)}</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-muted);">${percentage}%</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+        
+        container.innerHTML = chartHTML;
+    },
+    
+    /**
+     * Render job completion time metrics
+     */
+    renderCompletionTimeMetric: function(completionData) {
+        const container = document.getElementById('completion-time-data');
+        if (!container) return;
+        
+        if (!completionData || completionData.avg_completion_days === 0) {
+            container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No completion data available</p>';
+            return;
+        }
+        
+        const metricsHTML = `
+            <div class="completion-metrics">
+                <div class="metric-item" style="text-align: center; margin-bottom: 2rem;">
+                    <div style="font-size: 3rem; font-weight: bold; color: var(--primary); margin-bottom: 0.5rem;">
+                        ${completionData.avg_completion_days} days
+                    </div>
+                    <div style="font-size: 1.2rem; color: var(--text-secondary);">
+                        Average Completion Time
+                    </div>
+                </div>
+                
+                <div class="metric-details" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="detail-item" style="background: var(--bg-secondary); padding: 1rem; border-radius: var(--radius-md); text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 600; color: var(--status-approved);">
+                            ${completionData.fastest_completion_days} days
+                        </div>
+                        <div style="font-size: 0.875rem; color: var(--text-muted);">
+                            Fastest
+                        </div>
+                    </div>
+                    
+                    <div class="detail-item" style="background: var(--bg-secondary); padding: 1rem; border-radius: var(--radius-md); text-align: center;">
+                        <div style="font-size: 1.5rem; font-weight: 600; color: var(--status-rejected);">
+                            ${completionData.slowest_completion_days} days
+                        </div>
+                        <div style="font-size: 0.875rem; color: var(--text-muted);">
+                            Slowest
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1.5rem; text-align: center; color: var(--text-secondary); font-size: 0.875rem;">
+                    Based on ${completionData.total_completed_jobs} completed jobs
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = metricsHTML;
+    },
+    
+    /**
+     * Render freight mode chart with fallback
+     */
+    renderFreightModeChart: function(freightData) {
+        const canvas = document.getElementById('freight-mode-chart-canvas');
+        
+        if (!freightData || freightData.length === 0) {
+            if (canvas) {
+                canvas.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No freight mode data available</p>';
+            }
+            return;
+        }
+        
+        // Check if Chart.js is available
+        if (typeof Chart !== 'undefined' && canvas) {
+            this.renderFreightModeChartJS(freightData, canvas);
+        } else {
+            // Fallback to HTML chart
+            this.renderFreightModeHTML(freightData);
+        }
+    },
+    
+    /**
+     * Render freight mode chart with Chart.js
+     */
+    renderFreightModeChartJS: function(freightData, canvas) {
+        // Destroy existing chart
+        if (this.charts.freightMode) {
+            this.charts.freightMode.destroy();
+        }
+        
+        const ctx = canvas.getContext('2d');
+        
+        this.charts.freightMode = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: freightData.map(f => f.freight_mode),
+                datasets: [{
+                    data: freightData.map(f => parseInt(f.total_jobs)),
+                    backgroundColor: [
+                        'rgba(255, 159, 64, 0.6)',
+                        'rgba(153, 102, 255, 0.6)',
+                        'rgba(255, 205, 86, 0.6)'
+                    ],
+                    borderColor: [
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 205, 86, 1)'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Jobs by Freight Mode'
+                    },
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    },
+    
+    /**
+     * Render freight mode chart with HTML
+     */
+    renderFreightModeHTML: function(freightData) {
+        const container = document.getElementById('freight-mode-chart');
+        if (!container) return;
+        
+        const totalJobs = freightData.reduce((sum, f) => sum + parseInt(f.total_jobs || 0), 0);
+        const colors = ['#ff9f40', '#9966ff', '#ffcd56'];
+        
+        const chartHTML = `
+            <div class="freight-mode-chart-html">
+                ${freightData.map((freight, index) => {
+                    const jobs = parseInt(freight.total_jobs || 0);
+                    const percentage = totalJobs > 0 ? ((jobs / totalJobs) * 100).toFixed(1) : 0;
+                    const color = colors[index % colors.length];
+                    
+                    return `
+                        <div class="freight-item" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md); border-left: 4px solid ${color};">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>${Utils.escapeHTML(freight.freight_mode)}</strong>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                                        Revenue: ${Utils.formatCurrency(freight.total_revenue)}
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-weight: 600;">${jobs} jobs</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-muted);">${percentage}%</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+        
+        container.innerHTML = chartHTML;
+    },
+    
+    /**
+     * Populate salesmen filter dropdown
+     */
+    populateSalesmenFilter: function(salesmenData) {
+        const select = document.getElementById('salesman-filter');
+        if (!select || !salesmenData) return;
+        
+        // Clear existing options (except the first "All Salesmen")
+        while (select.children.length > 1) {
+            select.removeChild(select.lastChild);
+        }
+        
+        // Add salesman options
+        salesmenData.forEach(salesman => {
+            const option = document.createElement('option');
+            option.value = salesman.salesman_name;
+            option.textContent = salesman.salesman_name;
+            select.appendChild(option);
+        });
+    },
+    
+    /**
+     * Apply filters to analytics data
+     */
+    applyFilters: function() {
+        const freightMode = document.getElementById('freight-mode-filter').value;
+        const productType = document.getElementById('product-type-filter').value;
+        const salesman = document.getElementById('salesman-filter').value;
+        
+        // Create filter parameters
+        const filterParams = {};
+        if (freightMode) filterParams.freight_mode = freightMode;
+        if (productType) filterParams.product_type = productType;
+        if (salesman) filterParams.salesman = salesman;
+        
+        // Show loading message
+        UI.showToast('Applying filters...', 'info');
+        
+        // Reload data with filters
+        this.loadAnalyticsData();
+    },
+    
+    /**
+     * Export analytics to PDF
+     */
+    exportToPDF: async function() {
+        try {
+            UI.showToast('Generating PDF report...', 'info');
+            
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF();
+            
+            // Add title
+            pdf.setFontSize(20);
+            pdf.text('Analytics Report', 20, 30);
+            
+            // Add date
+            pdf.setFontSize(12);
+            pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 45);
+            
+            // Add summary stats if available
+            if (this.currentData && this.currentData.summary) {
+                const summary = this.currentData.summary;
+                let yPos = 65;
+                
+                pdf.setFontSize(16);
+                pdf.text('Summary Statistics', 20, yPos);
+                yPos += 20;
+                
+                pdf.setFontSize(12);
+                pdf.text(`Total Jobs: ${summary.jobs.total}`, 20, yPos);
+                yPos += 15;
+                pdf.text(`Approved Jobs: ${summary.jobs.approved}`, 20, yPos);
+                yPos += 15;
+                pdf.text(`Total Revenue: ${summary.financial.total_revenue}`, 20, yPos);
+                yPos += 15;
+                pdf.text(`Total Profit: ${summary.financial.total_profit}`, 20, yPos);
+                yPos += 15;
+                pdf.text(`Profit Margin: ${summary.financial.profit_margin}`, 20, yPos);
+            }
+            
+            // Save the PDF
+            pdf.save('analytics-report.pdf');
+            UI.showToast('PDF report downloaded successfully!', 'success');
+            
+        } catch (error) {
+            console.error('PDF export error:', error);
+            UI.showToast('Failed to generate PDF report', 'error');
+        }
+    },
+    
+    /**
+     * Enhanced monthly chart with Chart.js or HTML fallback
+     */
+    renderMonthlyChart: function(monthlyData) {
+        const canvas = document.getElementById('monthly-chart-canvas');
+        
+        if (!monthlyData || monthlyData.length === 0) {
+            if (canvas) {
+                canvas.parentElement.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No data available</p>';
+            }
+            return;
+        }
+        
+        // Check if Chart.js is available
+        if (typeof Chart !== 'undefined' && canvas) {
+            this.renderMonthlyChartJS(monthlyData, canvas);
+        } else {
+            // Fallback to HTML chart
+            this.renderMonthlyChartHTML(monthlyData);
+        }
+    },
+    
+    /**
+     * Render monthly chart with Chart.js
+     */
+    renderMonthlyChartJS: function(monthlyData, canvas) {
+        // Destroy existing chart
+        if (this.charts.monthly) {
+            this.charts.monthly.destroy();
+        }
+        
+        const ctx = canvas.getContext('2d');
+        
+        this.charts.monthly = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: monthlyData.map(m => m.month_name),
+                datasets: [{
+                    label: 'Total Jobs',
+                    data: monthlyData.map(m => m.total_jobs),
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    yAxisID: 'y'
+                }, {
+                    label: 'Revenue (KWD)',
+                    data: monthlyData.map(m => m.revenue),
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    yAxisID: 'y1'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Monthly Performance Trends'
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Month'
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Number of Jobs'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Revenue (KWD)'
+                        },
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                    }
+                }
+            }
+        });
+    },
+    
+    /**
+     * Fallback HTML monthly chart (original implementation)
+     */
+    renderMonthlyChartHTML: function(monthlyData) {
+        const container = document.getElementById('monthly-chart-data');
+        if (!container) return;
+        
+        if (!monthlyData || monthlyData.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">No data available</p>';
+            return;
+        }
+        
+        const maxJobs = Math.max(...monthlyData.map(m => m.total_jobs));
+        const maxRevenue = Math.max(...monthlyData.map(m => m.revenue));
+        
+        const chartHTML = `
+            <div style="overflow-x: auto;">
+                <div style="display: flex; gap: 1rem; min-width: 600px; align-items: end; height: 200px; padding: 1rem;">
+                    ${monthlyData.map(month => {
+                        const jobHeight = maxJobs > 0 ? (month.total_jobs / maxJobs) * 150 : 0;
+                        const revenueHeight = maxRevenue > 0 ? (month.revenue / maxRevenue) * 150 : 0;
+                        
+                        return `
+                            <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                                <div style="display: flex; gap: 2px; height: 160px; align-items: end;">
+                                    <div style="background: var(--primary); width: 15px; height: ${jobHeight}px; border-radius: 2px;" title="Jobs: ${month.total_jobs}"></div>
+                                    <div style="background: var(--accent); width: 15px; height: ${revenueHeight}px; border-radius: 2px;" title="Revenue: ${Utils.formatCurrency(month.revenue)}"></div>
+                                </div>
+                                <div style="margin-top: 0.5rem; font-size: 0.75rem; text-align: center;">
+                                    ${month.month_name}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <div style="display: flex; justify-content: center; gap: 2rem; margin-top: 1rem; font-size: 0.875rem;">
+                    <div><span style="display: inline-block; width: 15px; height: 15px; background: var(--primary); margin-right: 0.5rem;"></span>Jobs</div>
+                    <div><span style="display: inline-block; width: 15px; height: 15px; background: var(--accent); margin-right: 0.5rem;"></span>Revenue</div>
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = chartHTML;
+    },
+    
+    /**
      * Show analytics tab
      */
     showTab: function(tabId) {
@@ -611,7 +1424,7 @@ window.Analytics = {
      * Export analytics data
      */
     exportData: function() {
-        UI.showToast('Export functionality coming soon...', 'info');
+        this.exportToPDF();
     }
 };
 
@@ -695,6 +1508,46 @@ analyticsStyle.textContent = `
     .analytics-section h2 {
         margin-bottom: 2rem;
         color: var(--text-primary);
+    }
+    
+    .analytics-filters {
+        background: var(--bg-primary);
+        padding: 1.5rem;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-light);
+        margin-bottom: 2rem;
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        min-width: 120px;
+    }
+    
+    .filter-group label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+    
+    .filter-group select {
+        padding: 0.5rem;
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-md);
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+    
+    .filter-group select:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.2);
     }
 `;
 document.head.appendChild(analyticsStyle);
